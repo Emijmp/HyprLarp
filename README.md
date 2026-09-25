@@ -29,4 +29,4 @@
 
 ## 🚀 Installation
 
-> Installation instructions coming soon™.
+> Installation instructions coming soon.
