@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Launch HyprLarp or address its IPC endpoint without a shell intermediary."""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+PANELS = {
+  "launcher", "control", "wifi", "bluetooth", "notifications", "clipboard", "media", "calendar",
+  "session", "resources", "battery", "wallpapers", "capture", "audio", "brightness", "presentation",
+  "energy", "night-light", "usb", "osd"
+}
+
+
+def runtime() -> str:
+  for executable in [os.environ.get("HYPRLARP_QUICKSHELL", "quickshell"), "qs"]:
+    binary = shutil.which(executable)
+    if binary:
+      return binary
+  raise RuntimeError("Instala Quickshell 0.3.2+ antes de iniciar HyprLarp")
+
+
+def ipc(binary: str, method: str, *arguments: str, quiet: bool = False) -> bool:
+  result = subprocess.run([binary, "--path", str(ROOT / "shell.qml"), "ipc", "call", "shell", method, *arguments],
+              capture_output=True, text=True)
+  if result.returncode and result.stderr and not quiet:
+    print(result.stderr.strip(), file=sys.stderr)
+  return result.returncode == 0
+
+
+def doctor() -> int:
+  required = {"quickshell": "interfaz", "python3": "servicio del sistema", "hyprctl": "espacios de trabajo"}
+  optional = {"nmcli": "Wi-Fi", "bluetoothctl": "Bluetooth", "wpctl": "audio",
+        "brightnessctl": "brillo", "cliphist": "historial del portapapeles",
+        "wl-paste": "captura del portapapeles", "wl-copy": "copiar y capturas",
+        "grim": "capturas de pantalla", "slurp": "selector de región",
+        "hyprlock": "bloqueo", "playerctl": "teclas multimedia",
+        "nm-connection-editor": "VPN y Wi-Fi empresarial", "blueman-manager": "vinculación Bluetooth con PIN",
+        "powerprofilesctl": "perfiles de energía", "hyprsunset": "modo nocturno", "udisksctl": "unidades USB",
+        "magick": "miniaturas y editor de capturas", "pw-play": "sonido opcional de notificaciones", "hypridle": "bloqueo antes de suspender"}
+  missing = False
+  for name, description in required.items():
+    found = bool(shutil.which(name) or (name == "quickshell" and shutil.which("qs")))
+    print(f"{'✓' if found else '✗'} {name:23} {description}")
+    missing |= not found
+  for name, description in optional.items():
+    print(f"{'✓' if shutil.which(name) else '·'} {name:23} {description}")
+  print(f"{'✓' if importlib.util.find_spec('gi') else '·'} {'python-gobject':23} D-Bus nativo: energía y almacenamiento USB")
+  return int(missing)
+
+
+def main() -> int:
+  parser = argparse.ArgumentParser(description="HyprLarp · shell para Hyprland")
+  parser.add_argument("command", nargs="?", default="run", choices=["run", "preview", "settings", "toggle", "close", "lock", "screenshot-region", "screenshot-screen", "doctor", "install"])
+  parser.add_argument("panel", nargs="?", choices=sorted(PANELS))
+  parser.add_argument("--dry-run", action="store_true", help="Mostrar los archivos de instalación")
+  args = parser.parse_args()
+  if args.command == "doctor":
+    return doctor()
+  if args.command == "install":
+    return subprocess.call([sys.executable, str(ROOT / "tools/install.py")] + (["--dry-run"] if args.dry_run else []))
+  binary = runtime()
+  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(Path(__file__).resolve())}
+  sys.path.insert(0, str(ROOT))
+  from backend.icons import choose_icon_theme
+  icon_theme = choose_icon_theme(environment)
+  if icon_theme:
+    environment.setdefault("QS_ICON_THEME", icon_theme)
+  if args.command in {"run", "preview"}:
+    entrypoint = ROOT / "shell.qml"
+    if args.command == "preview":
+      entrypoint = ROOT / "preview.qml"
+      environment["HYPRLARP_PREVIEW"] = "1"
+      cache = Path(environment.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+      environment.setdefault("HYPRLARP_STATE_DIR", str(cache / "hyprlarp/preview"))
+    os.execvpe(binary, [binary, "--path", str(entrypoint), "--no-duplicate"], environment)
+  if args.command == "settings":
+    if ipc(binary, "settings", quiet=True):
+      return 0
+    environment["HYPRLARP_SETTINGS_ONLY"] = "1"
+    os.execvpe(binary, [binary, "--path", str(ROOT / "settings.qml"), "--no-duplicate"], environment)
+  if args.command == "toggle":
+    if not args.panel:
+      parser.error("toggle necesita el nombre de un panel")
+    return 0 if ipc(binary, "toggle", args.panel) else 1
+  if args.command == "close":
+    return 0 if ipc(binary, "close") else 1
+  if args.command == "lock":
+    sys.path.insert(0, str(ROOT))
+    from backend.service import Service
+    Service.session("lock")
+    return 0
+  if args.command in {"screenshot-region", "screenshot-screen"}:
+    return 0 if ipc(binary, "capture", args.command.removeprefix("screenshot-")) else 1
+  return 0
+
+
+if __name__ == "__main__":
+  try:
+    sys.exit(main())
+  except (OSError, RuntimeError) as error:
+    print(f"HyprLarp: {error}", file=sys.stderr)
+    sys.exit(1)

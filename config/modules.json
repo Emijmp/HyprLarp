@@ -1,0 +1,434 @@
+[
+  {
+    "id": "launcher",
+    "title": "Aplicaciones",
+    "icon": "grid",
+    "kind": "panel",
+    "target": "launcher",
+    "group": "Paneles",
+    "description": "Buscar aplicaciones, favoritas y recientes."
+  },
+  {
+    "id": "workspaces",
+    "title": "Espacios de trabajo",
+    "icon": "grid",
+    "kind": "workspaces",
+    "target": "",
+    "group": "Barra",
+    "description": "Cambiar de espacio en este monitor."
+  },
+  {
+    "id": "clock",
+    "title": "Reloj",
+    "icon": "clock",
+    "kind": "panel",
+    "target": "calendar",
+    "group": "Barra",
+    "description": "Hora actual y acceso al calendario."
+  },
+  {
+    "id": "calendar",
+    "title": "Calendario",
+    "icon": "calendar",
+    "kind": "panel",
+    "target": "calendar",
+    "group": "Paneles",
+    "description": "Fecha y calendario mensual."
+  },
+  {
+    "id": "wifi",
+    "title": "Wi-Fi",
+    "icon": "wifi",
+    "kind": "panel",
+    "target": "wifi",
+    "group": "Paneles",
+    "description": "Redes, conexión y desconexión."
+  },
+  {
+    "id": "bluetooth",
+    "title": "Bluetooth",
+    "icon": "bluetooth",
+    "kind": "panel",
+    "target": "bluetooth",
+    "group": "Paneles",
+    "description": "Adaptadores y dispositivos Bluetooth."
+  },
+  {
+    "id": "volume",
+    "title": "Volumen",
+    "icon": "volume",
+    "kind": "panel",
+    "target": "audio",
+    "group": "Paneles",
+    "description": "Mezclador; rueda para volumen y clic central para silencio."
+  },
+  {
+    "id": "audio",
+    "title": "Audio",
+    "icon": "sliders",
+    "kind": "panel",
+    "target": "audio",
+    "group": "Paneles",
+    "description": "Salidas, entradas y volumen por aplicación."
+  },
+  {
+    "id": "microphone",
+    "title": "Micrófono",
+    "icon": "microphone",
+    "kind": "panel",
+    "target": "audio",
+    "group": "Paneles",
+    "description": "Entradas de audio; clic central para silenciar."
+  },
+  {
+    "id": "brightness",
+    "title": "Brillo",
+    "icon": "sun",
+    "kind": "panel",
+    "target": "brightness",
+    "group": "Paneles",
+    "description": "Brillo de pantalla; rueda para ajustarlo."
+  },
+  {
+    "id": "battery",
+    "title": "Batería",
+    "icon": "battery",
+    "kind": "panel",
+    "target": "battery",
+    "group": "Paneles",
+    "description": "Carga, estado y salud de las baterías."
+  },
+  {
+    "id": "notifications",
+    "title": "Notificaciones e historial",
+    "icon": "bell",
+    "kind": "panel",
+    "target": "notifications",
+    "group": "Paneles",
+    "description": "Buscar avisos y consultar el historial por aplicación."
+  },
+  {
+    "id": "clipboard",
+    "title": "Portapapeles e historial",
+    "icon": "clipboard",
+    "kind": "panel",
+    "target": "clipboard",
+    "group": "Paneles",
+    "description": "Texto, imágenes, búsqueda y entradas fijadas."
+  },
+  {
+    "id": "media",
+    "title": "Multimedia",
+    "icon": "music",
+    "kind": "panel",
+    "target": "media",
+    "group": "Paneles",
+    "description": "Reproductores y controles multimedia."
+  },
+  {
+    "id": "resources",
+    "title": "Recursos",
+    "icon": "cpu",
+    "kind": "panel",
+    "target": "resources",
+    "group": "Paneles",
+    "description": "CPU, RAM, disco, temperatura y red."
+  },
+  {
+    "id": "wallpapers",
+    "title": "Fondos de pantalla",
+    "icon": "image",
+    "kind": "panel",
+    "target": "wallpapers",
+    "group": "Paneles",
+    "description": "Elegir un fondo o abrir su carpeta."
+  },
+  {
+    "id": "capture",
+    "title": "Capturas y editor",
+    "icon": "camera",
+    "kind": "panel",
+    "target": "capture",
+    "group": "Paneles",
+    "description": "Región, ventana o escritorio; temporizador y anotaciones."
+  },
+  {
+    "id": "control",
+    "title": "Centro de control",
+    "icon": "sliders",
+    "kind": "panel",
+    "target": "control",
+    "group": "Paneles",
+    "description": "Conexiones, audio, pantalla y controles del sistema."
+  },
+  {
+    "id": "session",
+    "title": "Menú de sesión",
+    "icon": "power",
+    "kind": "panel",
+    "target": "session",
+    "group": "Paneles",
+    "description": "Bloqueo, suspensión y opciones de sesión."
+  },
+  {
+    "id": "tray",
+    "title": "Bandeja del sistema",
+    "icon": "grid",
+    "kind": "tray",
+    "target": "",
+    "group": "Barra",
+    "description": "Aplicaciones de la bandeja y sus menús contextuales."
+  },
+  {
+    "id": "settings",
+    "title": "Configuración",
+    "icon": "sliders",
+    "kind": "settings",
+    "target": "Appearance",
+    "group": "Configuración",
+    "description": "Abrir la app de configuración del shell."
+  },
+  {
+    "id": "themes",
+    "title": "Temas y colores",
+    "icon": "palette",
+    "kind": "settings",
+    "target": "Appearance",
+    "group": "Configuración",
+    "description": "Elegir o editar una paleta desde configuración."
+  },
+  {
+    "id": "profiles",
+    "title": "Perfiles y biblioteca",
+    "icon": "layers",
+    "kind": "settings",
+    "target": "Profiles",
+    "group": "Configuración",
+    "description": "Guardar perfiles y paletas; importar o exportar."
+  },
+  {
+    "id": "shortcuts",
+    "title": "Atajos de teclado",
+    "icon": "keyboard",
+    "kind": "settings",
+    "target": "Shortcuts",
+    "group": "Configuración",
+    "description": "Capturar combinaciones y comprobar conflictos."
+  },
+  {
+    "id": "bar-settings",
+    "title": "Ajustes de barra",
+    "icon": "bar",
+    "kind": "settings",
+    "target": "Bar",
+    "group": "Configuración",
+    "description": "Posición, grosor, padding, márgenes y opacidad."
+  },
+  {
+    "id": "module-settings",
+    "title": "Gestionar módulos",
+    "icon": "grid",
+    "kind": "settings",
+    "target": "Modules",
+    "group": "Configuración",
+    "description": "Añadir, quitar, ordenar y personalizar módulos."
+  },
+  {
+    "id": "notification-settings",
+    "title": "Reglas de notificaciones",
+    "icon": "bell",
+    "kind": "settings",
+    "target": "General",
+    "group": "Configuración",
+    "description": "Configurar avisos, sonidos e historial por aplicación."
+  },
+  {
+    "id": "clipboard-settings",
+    "title": "Ajustes del portapapeles",
+    "icon": "clipboard",
+    "kind": "settings",
+    "target": "General",
+    "group": "Configuración",
+    "description": "Captura y caducidad del historial."
+  },
+  {
+    "id": "do-not-disturb",
+    "title": "No molestar",
+    "icon": "bell-off",
+    "kind": "toggle",
+    "target": "doNotDisturb",
+    "group": "Controles rápidos",
+    "description": "Activar o desactivar No molestar."
+  },
+  {
+    "id": "presentation",
+    "title": "Presentación",
+    "icon": "presentation",
+    "kind": "toggle",
+    "target": "presentation",
+    "group": "Controles rápidos",
+    "description": "Silenciar avisos e inhibir el reposo automático."
+  },
+  {
+    "id": "clipboard-pause",
+    "title": "Pausar portapapeles",
+    "icon": "clipboard-pause",
+    "kind": "toggle",
+    "target": "clipboardPaused",
+    "group": "Controles rápidos",
+    "description": "Pausar o reanudar la captura sin borrar el historial."
+  },
+  {
+    "id": "mute",
+    "title": "Silenciar audio",
+    "icon": "muted",
+    "kind": "command",
+    "target": "mute",
+    "group": "Controles rápidos",
+    "description": "Silenciar o recuperar el volumen de salida."
+  },
+  {
+    "id": "microphone-mute",
+    "title": "Silenciar micrófono",
+    "icon": "microphone-off",
+    "kind": "command",
+    "target": "microphone-mute",
+    "group": "Controles rápidos",
+    "description": "Silenciar o recuperar la entrada predeterminada."
+  },
+  {
+    "id": "media-play-pause",
+    "title": "Reproducir / pausar",
+    "icon": "play",
+    "kind": "command",
+    "target": "media-play-pause",
+    "group": "Multimedia",
+    "description": "Alternar la reproducción del reproductor seleccionado."
+  },
+  {
+    "id": "media-previous",
+    "title": "Pista anterior",
+    "icon": "previous",
+    "kind": "command",
+    "target": "media-previous",
+    "group": "Multimedia",
+    "description": "Reproducir la pista anterior."
+  },
+  {
+    "id": "media-next",
+    "title": "Pista siguiente",
+    "icon": "next",
+    "kind": "command",
+    "target": "media-next",
+    "group": "Multimedia",
+    "description": "Reproducir la pista siguiente."
+  },
+  {
+    "id": "screenshot-region",
+    "title": "Capturar región",
+    "icon": "crop",
+    "kind": "command",
+    "target": "screenshot-region",
+    "group": "Capturas directas",
+    "description": "Abrir el selector de región y copiar la captura."
+  },
+  {
+    "id": "screenshot-window",
+    "title": "Capturar ventana",
+    "icon": "window",
+    "kind": "command",
+    "target": "screenshot-window",
+    "group": "Capturas directas",
+    "description": "Capturar la ventana activa y copiarla."
+  },
+  {
+    "id": "screenshot-screen",
+    "title": "Capturar escritorio",
+    "icon": "monitor",
+    "kind": "command",
+    "target": "screenshot-screen",
+    "group": "Capturas directas",
+    "description": "Capturar el escritorio completo y copiarlo."
+  },
+  {
+    "id": "lock",
+    "title": "Bloquear",
+    "icon": "lock",
+    "kind": "command",
+    "target": "lock",
+    "group": "Sesión",
+    "description": "Bloquear la sesión con hyprlock."
+  },
+  {
+    "id": "suspend",
+    "title": "Suspender",
+    "icon": "moon",
+    "kind": "session",
+    "target": "suspend",
+    "group": "Sesión",
+    "description": "Abrir la confirmación de suspensión con bloqueo."
+  },
+  {
+    "id": "logout",
+    "title": "Cerrar sesión",
+    "icon": "logout",
+    "kind": "session",
+    "target": "logout",
+    "group": "Sesión",
+    "description": "Abrir la confirmación para cerrar la sesión."
+  },
+  {
+    "id": "reboot",
+    "title": "Reiniciar",
+    "icon": "restart",
+    "kind": "session",
+    "target": "reboot",
+    "group": "Sesión",
+    "description": "Abrir la confirmación de reinicio."
+  },
+  {
+    "id": "poweroff",
+    "title": "Apagar",
+    "icon": "power",
+    "kind": "session",
+    "target": "poweroff",
+    "group": "Sesión",
+    "description": "Abrir la confirmación para apagar el equipo."
+  },
+  {
+    "id": "energy",
+    "title": "Perfiles de energía",
+    "icon": "plug",
+    "kind": "panel",
+    "target": "energy",
+    "group": "Paneles",
+    "description": "Ahorro, equilibrado y rendimiento según el equipo."
+  },
+  {
+    "id": "night-light",
+    "title": "Modo nocturno / descanso visual",
+    "icon": "moon",
+    "kind": "panel",
+    "target": "night-light",
+    "group": "Paneles",
+    "description": "Temperatura de color y activación manual o por horario."
+  },
+  {
+    "id": "usb",
+    "title": "Dispositivos USB",
+    "icon": "usb",
+    "kind": "panel",
+    "target": "usb",
+    "group": "Paneles",
+    "description": "Dispositivos conectados; montar, abrir, desmontar y expulsar unidades de datos."
+  },
+  {
+    "id": "osd",
+    "title": "OSD de volumen y brillo",
+    "icon": "volume",
+    "kind": "settings",
+    "target": "General",
+    "group": "Configuración",
+    "description": "Activar, colocar y probar los indicadores de nivel."
+  }
+]

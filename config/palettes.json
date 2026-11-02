@@ -1,0 +1,80 @@
+{
+  "amoled": {
+    "name": "AMOLED Black",
+    "background": "#000000",
+    "surface": "#000000",
+    "raised": "#101010",
+    "moduleSurface": "#141414",
+    "border": "#ffffff",
+    "separator": "#292929",
+    "text": "#ffffff",
+    "muted": "#a0a0a0",
+    "accent": "#ffffff",
+    "danger": "#ffffff"
+  },
+  "gruvbox": {
+    "name": "Gruvbox Dark",
+    "background": "#282828",
+    "surface": "#282828",
+    "raised": "#32302f",
+    "moduleSurface": "#32302f",
+    "border": "#ebdbb2",
+    "separator": "#504945",
+    "text": "#ebdbb2",
+    "muted": "#bdae93",
+    "accent": "#d79921",
+    "danger": "#fb4934"
+  },
+  "catppuccin": {
+    "name": "Catppuccin Mocha",
+    "background": "#1e1e2e",
+    "surface": "#1e1e2e",
+    "raised": "#313244",
+    "moduleSurface": "#252536",
+    "border": "#cdd6f4",
+    "separator": "#45475a",
+    "text": "#cdd6f4",
+    "muted": "#a6adc8",
+    "accent": "#f5e0dc",
+    "danger": "#f38ba8"
+  },
+  "oxocarbon": {
+    "name": "Oxocarbon",
+    "background": "#161616",
+    "surface": "#161616",
+    "raised": "#393939",
+    "moduleSurface": "#262626",
+    "border": "#f2f4f8",
+    "separator": "#525252",
+    "text": "#f2f4f8",
+    "muted": "#dde1e6",
+    "accent": "#3ddbd9",
+    "danger": "#ee5396"
+  },
+  "tokyonight": {
+    "name": "Tokyo Night",
+    "background": "#1a1b26",
+    "surface": "#1a1b26",
+    "raised": "#292e42",
+    "moduleSurface": "#1f2335",
+    "border": "#c0caf5",
+    "separator": "#414868",
+    "text": "#c0caf5",
+    "muted": "#a9b1d6",
+    "accent": "#7aa2f7",
+    "danger": "#f7768e"
+  },
+  "onedark": {
+    "name": "One Dark Pro",
+    "background": "#282c34",
+    "surface": "#282c34",
+    "raised": "#3e4451",
+    "moduleSurface": "#2c313c",
+    "border": "#abb2bf",
+    "separator": "#4b5263",
+    "text": "#abb2bf",
+    "muted": "#9da5b4",
+    "accent": "#61afef",
+    "danger": "#e06c75"
+  }
+}

@@ -1,0 +1,12 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const context = vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(__dirname, "../core/fuzzy.js"), "utf8"), context);
+assert.equal(context.normalize("Configuración"), "configuracion");
+assert.ok(context.score("alacrty", "alacritty", "terminal") > 0);
+assert.ok(context.score("ff", "firefox", "browser") > 0);
+assert.equal(context.score("totally-unrelated", "alacritty", "terminal"), -1);
+assert.ok(context.score("fire", "firefox", "browser") > context.score("fire", "wildfire", "browser"));
+assert.ok(context.score("fire browser", "firefox", "firefox browser") > 0);

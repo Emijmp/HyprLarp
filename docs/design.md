@@ -1,0 +1,25 @@
+# Diseño de HyprLarp
+
+AMOLED Black es el tema inicial: `#000000` en fondo y superficies principales, `#ffffff` en texto, iconos y borde exterior de 1 px. Los módulos de barra tienen fondo `#141414`, borde gris y radio inicial de 2 px; el borde pasa a blanco al abrir su panel o señalarlo. Gruvbox, Catppuccin, Oxocarbon, Tokyo Night y One Dark Pro mantienen la estructura y cambian la paleta. El editor personalizado expone todos los roles de color y admite paletas claras.
+
+- Detalles visuales Sutil/Mínimo: puntos de estado en los módulos, dos remates rectos en paneles y marcas de sección; todos estáticos, monocromos y opcionales. No añadir iluminación ni cambiar automáticamente la redondez al elegir decoración.
+- Barra de 34 px, módulos con fondo individual, padding y márgenes configurables. Se pueden añadir, quitar y reordenar. El fondo del indicador de espacios abraza su contenido y deja libre el espacio que separa los grupos de la barra.
+- Cada función y acción principal tiene una entrada en el catálogo de módulos: 48 en total, incluidos energía, modo nocturno, USB y acceso a los ajustes del OSD. Configuración los organiza en En la barra, Añadir y Aspecto, con búsqueda y categorías. Los botones de sesión conservan su confirmación; las acciones de deshacer/reset no salen de configuración.
+- Centro de control en una columna de texto, sliders y acciones. Configuración con pestañas de texto en la parte superior.
+- Deshacer, rehacer y restablecer están en la cabecera de configuración y solo se habilitan con esa ventana enfocada. El historial pertenece a los cambios hechos en configuración. La confirmación de reset es una fila de texto con acciones, sin efectos ni diálogos decorativos. El tema personalizado usa campos hexadecimales y muestras de color rectangulares con selector RGB.
+- Redes y dispositivos en listas; recursos como lecturas y líneas de nivel. Launcher centrado en su pantalla, con iconos reales de aplicaciones activados inicialmente y búsqueda alineada a la izquierda.
+- Todo dato del escritorio proviene del sistema. No se incluyen datos de demostración en la interfaz normal. Las muestras de `tools/Smoke.qml` son fixtures de prueba.
+- Multimedia está desactivado inicialmente en la barra y necesita un reproductor real. No se añade clima ni módulos sin una función solicitada.
+- Redondez configurable de 0 a 8 px, con valor general y excepciones para barra, paneles, botones, campos, espacios, avisos y ayudas. Los módulos tienen su propio radio por monitor. Inicialmente se conservan las esquinas rectas y los módulos a 2 px; los indicadores lineales de sliders permanecen rectos.
+- No añadir la pequeña línea superior en los módulos de barra. Inicialmente solo se dibuja el espacio actual, con un recuadro completo de alto contraste. Los modos opcionales con puntos o números compactos permiten navegar a grupos ocultos. La rueda conserva todos los destinos del monitor.
+- OSD rectangular de 280 × 66 px, con icono monocromo, nivel y línea de 2 px. Se crea durante un cambio de nivel y se destruye al caducar. No roba foco ni captura ratón. Su demostración está marcada como Prueba.
+- Energía y batería usan filas de texto y valores; USB distingue el inventario de periféricos de las acciones de almacenamiento. El modo nocturno comparte controles entre su panel y General. Los datos ausentes no se sustituyen por cifras inventadas.
+- Blur apagado inicialmente y opacidad al 100%. No hay texturas, brillos, sombras, gradientes ni efectos de cristal.
+- No usar cápsulas, píldoras, iconos en círculos de color, emojis, tarjetas decorativas, titulares de marketing ni contenido de relleno.
+- No usar animaciones de entrada, escalados al hacer hover, rebotes o transiciones largas. La transición de color opcional dura 80 ms.
+- Iconos vectoriales monocromos con el mismo color en todos los módulos. El acento es global para selección y sliders.
+- Alineación a la izquierda para contenido y formularios. El launcher se centra por petición expresa; los otros paneles conservan su posición junto a la barra. El bloqueo coloca hora y contraseña abajo a la izquierda.
+- Datos de escritorio mediante eventos cuando el servicio los ofrece; muestreo local solo para vistas y módulos activos. No añadir efectos ni animaciones que provoquen renderizado continuo.
+- Indentación de 2 espacios. Respetar `.editorconfig` y `.qmlformat.ini`.
+
+Las paletas incluidas están en [config/palettes.json](../config/palettes.json); la personalizada se guarda con los ajustes del usuario. Referencias de color: [Gruvbox](https://github.com/morhetz/gruvbox-contrib/blob/master/color.table), [Catppuccin Mocha](https://github.com/catppuccin/lapce/blob/main/catppuccin-mocha.toml), [Oxocarbon](https://github.com/nyoom-engineering/oxocarbon.nvim/blob/main/lua/oxocarbon/init.lua), [Tokyo Night](https://github.com/folke/tokyonight.nvim/blob/main/lua/tokyonight/colors/night.lua) y [One Dark Pro](https://github.com/Binaryify/OneDark-Pro/blob/master/themes/OneDark-Pro.json). Sus colores se adaptan a los roles del shell. No se incorporan layouts ni código de esos proyectos.
