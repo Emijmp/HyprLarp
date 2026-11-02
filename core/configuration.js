@@ -12,7 +12,7 @@ var entries = [
   ["Modules", "Inicio", "modulos agregar quitar arrastrar reordenar centro final inicio bandeja tray ocultos"],
   ["Modules", "Aspecto de los módulos", "fondo radio padding borde transparencia opacidad"],
   ["Wallpapers", "Fondos", "wallpaper imagen directorio carpeta"],
-  ["Shortcuts", "Atajos", "teclado capturar combinacion conflicto aplicar"],
+  ["Shortcuts", "Atajos", "binds teclado capturar combinacion conflicto aplicar agregar eliminar modificar personalizados comandos actuales noctalia"],
   ["General", "Historial del portapapeles", "clipboard activar desactivar pausar caducidad vencimiento"],
   ["General", "Notificaciones", "sonido popup avisos reglas aplicaciones historial"],
   ["Profiles", "Perfiles", "guardar cargar perfil importar exportar json biblioteca temas"]

@@ -14,7 +14,7 @@ SECTIONS = {
   "Modules": {"barModules", "barZones", "disabledModules", "moduleOpacity", "moduleOpacities",
     "moduleBackgroundOpacity", "moduleBorderWidth", "modulePaddingX", "modulePaddingY", "moduleRadius", "trayHiddenItems"},
   "Wallpapers": {"wallpaper", "wallpaperDirectory"},
-  "Shortcuts": {"shortcuts"},
+  "Shortcuts": {"shortcuts", "customBindings", "migrateNoctaliaBinds"},
   "General": {"osdEnabled", "osdTimeout", "osdPosition", "nightLightEnabled", "nightLightTemperature", "nightLightSchedule", "nightLightStart", "nightLightEnd", "clipboardEnabled", "clipboardPaused", "clipboardRetentionHours", "notificationHistoryLimit",
     "notificationRules", "showAppIcons"}
 }

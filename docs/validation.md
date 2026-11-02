@@ -56,3 +56,12 @@ El informe incluye CPU expresada sobre un núcleo, RSS, PSS cuando se permite le
 - En Apariencia cambia cada detalle por separado, activa Mínimo y vuelve a Sutil. Comprueba que conserva las elecciones, permite Deshacer/Rehacer solo desde configuración y recupera los valores iniciales con Restablecer sección.
 - Ejecuta los scripts con un `--prefix` temporal, prueba reinstalar y desinstalar, y comprueba que se conservan los ajustes por defecto y que `--purge` los elimina. El conjunto automático también prueba rutas reservadas, manifiestos manipulados, enlaces simbólicos, rollback y lanzamiento Desktop Entry con GLib.
 - Repite la medición con `tools/benchmark.py --pid PID --seconds 300` sobre el escritorio real. Incluye copiar una imagen 4K, varias aplicaciones multimedia, muchos avisos y activar/desactivar los módulos que uses. Comprueba que cerrar el shell no deja sus procesos de captura o del filtro nocturno; los editores externos y el bloqueo son aplicaciones independientes.
+
+## Binds actuales y editor
+
+1. Sigue [binds.md](binds.md): carga el preludio antes de tus declaraciones y la integración al final. Conserva los binds de terminal, cierre, explorador, ventanas, ratón, espacios y scratchpad.
+2. Prueba Super + Espacio, Super + M, Super + Coma, Super + X, Super + V y Print tras transferir las acciones de Noctalia. Comprueba que Super + Shift + S sigue moviendo al espacio especial. Alt + Tab debe recorrer ventanas con Hyprland.
+3. Mantén volumen/brillo pulsado y prueba una segunda pulsación tras soltar: los callbacks de repetición y release deben conservar su funcionamiento. El micrófono y la reproducción del archivo original deben seguir operativos.
+4. En Atajos añade un comando de prueba y una acción del shell, cambia su combinación con Capturar, desactiva y elimina. Deshaz y rehace los cambios dentro de configuración y pulsa Aplicar. Un duplicado debe rechazarse.
+5. En Actuales mueve una función Lua a otra combinación y desactívala. Elimina su personalización para restaurarla. Prueba un bind dentro de un submap: sus otros binds deben seguir funcionando. Un conflicto conserva el original salvo reemplazo explícito.
+6. Prueba reinstalar y retirar una instalación temporal. La retirada solo debe desactivar su propio adaptador; los bloques de integración y los originales del usuario se gestionan en su archivo, sin reescrituras del instalador.

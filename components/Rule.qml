@@ -4,7 +4,7 @@ import "../core"
 
 Rectangle {
   visible: Theme.detail("separators")
-  implicitHeight: visible ? 1 : 0
+  implicitHeight: 1
   Layout.fillWidth: true
   color: Theme.separator
 }

@@ -187,14 +187,14 @@ class SystemFeatureTests(unittest.TestCase):
       sync.assert_called_once_with(power=True, usb=False)
       backlight.assert_called_once()
 
-  def test_media_keys_include_microphone_and_respect_custom_bindings(self):
+  def test_media_keys_are_preserved_instead_of_regenerated(self):
     settings = copy.deepcopy(DEFAULTS)
     bindings = generate_bindings(settings, ROOT / "bin/hyprlarp")
-    self.assertIn("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", bindings)
+    self.assertNotIn("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", bindings)
     settings["shortcuts"]["launcher"] = ", XF86AudioMicMute"
     bindings = generate_bindings(settings, ROOT / "bin/hyprlarp")
     self.assertNotIn("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle", bindings)
-    self.assertEqual(bindings.count('hl.unbind("XF86AudioMicMute")'), 1)
+    self.assertNotIn("hl.unbind", bindings)
 
   def test_usb_eject_unmounts_before_poweroff_and_never_forces(self):
     devices = self.setup_devices()

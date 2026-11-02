@@ -89,3 +89,7 @@ Comparación de esta revisión con el código inmediatamente anterior. Cada mues
 Las mejoras verificadas son límites de crecimiento y menos trabajo por evento: tres workers y doce tareas pendientes como máximo; lecturas y salidas de procesos acotadas; captura del portapapeles limitada antes de guardarla; hasta 64 avisos activos sin acumular callbacks al sustituirlos; escrituras agrupadas y un único vencimiento de avisos programado. La lectura ligera de la barra omite disco, red y sensores; el panel completo reutiliza los datos de disco durante diez segundos y el descubrimiento térmico durante sesenta. Las cachés de iconos tienen límite y se retiran las referencias a aplicaciones eliminadas.
 
 Los seis interruptores de decoración controlan dibujos nativos sin temporizadores propios. Los helpers gestionados terminan con el backend, incluidos los capturadores del portapapeles, evitando procesos residuales. El alcance y las comprobaciones de estas correcciones se detallan en [review.md](review.md).
+
+## Binds conservados
+
+El gestor registra los handlers nativos durante la carga de la configuración y conserva los callbacks originales. La transferencia de comandos de Noctalia usa dispatchers nativos y las herramientas de audio/brillo existentes; no añade un cliente Noctalia por pulsación. Las funciones de repetición del usuario conservan su frecuencia. No hay sondeos ni procesos residentes nuevos. La consulta de binds es explícita y las listas del editor crean solo los delegados visibles. Véase [binds.md](binds.md).

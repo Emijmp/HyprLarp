@@ -10,9 +10,18 @@ import subprocess
 
 from deployment import ROOT, Locations, MARKER, digest, load_manifest, no_symlinks, read_json, deployment_lock
 from backend.safety import idle_processes
+from backend.service import lua_string
 
 
 def stop_runtime(locations):
+  hyprctl = shutil.which('hyprctl')
+  if hyprctl:
+    owned = lua_string(str(locations.app / 'config/bindings-runtime.lua'))
+    expression = 'if HyprLarpBinds and HyprLarpBinds.runtimePath == ' + owned + ' then HyprLarpBinds.stop() end'
+    try:
+      subprocess.run([hyprctl, 'eval', expression], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+      pass
   binary = shutil.which('quickshell') or shutil.which('qs')
   if binary:
     for entry in ('shell.qml', 'settings.qml', 'preview.qml'):

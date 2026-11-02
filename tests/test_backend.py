@@ -110,8 +110,9 @@ class ConfigurationTests(unittest.TestCase):
 
   def test_bindings_quote_paths_and_keep_the_keyboard_modifiers(self):
     generated = generate_bindings(DEFAULTS, Path("/tmp/a b/hyprlarp"))
-    self.assertIn('hl.bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("\'/tmp/a b/hyprlarp\' settings"))', generated)
-    self.assertIn("wpctl set-volume -l 1", generated)
+    self.assertIn("'/tmp/a b/hyprlarp' settings", generated)
+    self.assertIn('["chord"] = "SUPER, comma"', generated)
+    self.assertNotIn("hl.unbind", generated)
 
   def test_migration_preserves_enabled_module_order_and_custom_shortcuts(self):
     with tempfile.TemporaryDirectory() as directory:
@@ -146,8 +147,8 @@ class ConfigurationTests(unittest.TestCase):
     generated = generate_bindings(settings, ROOT / "bin/hyprlarp")
     self.assertNotIn("toggle wifi", generated)
     self.assertNotIn("workspace = 1 }", generated)
-    self.assertIn("workspace = 10 }", generated)
-    self.assertIn('hl.unbind("SUPER + C")', generated)
+    self.assertNotIn("workspace = ", generated)
+    self.assertNotIn("hl.unbind", generated)
 
   def test_saving_identical_settings_does_not_write_to_disk(self):
     with tempfile.TemporaryDirectory() as directory, patch("backend.service.atomic_json") as write:
@@ -323,7 +324,9 @@ class InstallerTests(unittest.TestCase):
       subprocess.run([sys.executable, str(ROOT / "tools/install.py"), "--prefix", str(prefix)],
              check=True, capture_output=True)
       config = Path(directory) / "verify.lua"
-      config.write_text("dofile(" + lua_string(str(prefix / "config/hyprlarp/hyprlarp.lua")) + ")\n"
+      config.write_text("dofile(" + lua_string(str(prefix / "config/hyprlarp/bindings-prelude.lua")) + ")\n"
+               + "hl.bind(\"SUPER + SHIFT + S\", function() end)\n"
+               + "dofile(" + lua_string(str(prefix / "config/hyprlarp/hyprlarp.lua")) + ")\n"
                + "dofile(" + lua_string(str(ROOT / "config/hyprland-look.lua")) + ")\n")
       result = subprocess.run(["Hyprland", "--verify-config", "--config", str(config)],
                   capture_output=True, text=True, timeout=15)

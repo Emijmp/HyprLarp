@@ -224,7 +224,22 @@ La desinstalación detiene las instancias del shell instaladas y el hypridle que
 
 Puedes probar un ciclo completo en un destino aislado con `./install.sh --prefix /tmp/hyprlarp-demo`; usa el mismo `--prefix /tmp/hyprlarp-demo` al ejecutar `uninstall.sh`. Los modos `--dry-run` no crean ni borran archivos. El bloqueo de operaciones deja un archivo vacío `.hyprlarp-install.lock` en el directorio de datos; evita competir con otra instalación y no contiene datos personales.
 
-Para iniciarlo con Hyprland, añade esto a `~/.config/hypr/hyprland.lua`:
+Para conservar y personalizar tus binds, añade este bloque **antes del primer `hl.bind`** de `~/.config/hypr/hyprland.lua`:
+
+```lua
+local hyprlarpConfig = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+local prelude = hyprlarpConfig .. "/hyprlarp/bindings-prelude.lua"
+local preludeFile = io.open(prelude, "r")
+if preludeFile then
+  preludeFile:close()
+  dofile(prelude)
+end
+```
+
+Conserva tu bloque actual de binds, incluidos callbacks, espacios y teclas multimedia. Para sustituir Noctalia, quita su arranque del bloque `hyprland.start`; si vas a usar el filtro nocturno de HyprLarp, quita también el arranque externo de `hyprsunset`. La guía [Migrar y personalizar binds](docs/binds.md) explica la transferencia y las opciones del editor.
+
+**Al final del archivo**, carga la integración del shell:
+
 
 ```lua
 local config = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
@@ -257,14 +272,14 @@ Este archivo aplica separación, bordes blancos de 1 px, esquinas rectas y desac
 | Atajo inicial | Acción |
 | --- | --- |
 | Super + Espacio | Aplicaciones |
-| Super + A | Centro de control |
+| Super + M | Centro de control |
 | Super + N | Notificaciones |
 | Super + V | Portapapeles |
-| Super + M | Multimedia |
+| Super + Ctrl + M | Multimedia |
 | Super + C | Calendario |
 | Super + W | Fondos |
-| Super + Escape | Sesión |
-| Super + Shift + S | Configuración |
+| Super + X | Sesión |
+| Super + Coma | Configuración |
 | Super + Ctrl + W | Wi-Fi |
 | Super + Ctrl + B | Bluetooth |
 | Super + Ctrl + R | Monitor de recursos |
@@ -286,7 +301,7 @@ Este archivo aplica separación, bordes blancos de 1 px, esquinas rectas y desac
 | Brillo + / − | Brillo de pantalla |
 | Reproducir / pausa, anterior, siguiente | Reproductor multimedia |
 
-**Super** es la tecla Windows. Los atajos globales necesitan la inclusión de `hyprlarp.lua`; no se instalan con la vista previa. Puedes editar los de los paneles en **Configuración → Atajos** y aplicarlos con el botón de esa página. Un campo vacío desactiva ese atajo. El generador sustituye las asignaciones existentes de esas combinaciones para que no se ejecuten dos acciones a la vez, y respeta los atajos personalizados que usen Super + un número. La rueda ajusta volumen, micrófono o brillo en su módulo; el clic central silencia volumen o micrófono; el botón central sobre multimedia reproduce/pausa y el botón derecho sobre un módulo abre su gestión dentro de configuración.
+**Super** es la tecla Windows. Los atajos globales necesitan la inclusión de `hyprlarp.lua`; no se instalan con la vista previa. Puedes editar los de los paneles en **Configuración → Atajos** y aplicarlos con el botón de esa página. Un campo vacío desactiva ese atajo. El gestor conserva los binds existentes y omite los nuevos que entren en conflicto; no regenera tus espacios ni tus teclas multimedia. Configuración → Atajos permite añadir, eliminar y editar comandos o acciones del shell. En Actuales en Hyprland puedes cambiar la combinación de una acción Lua conservando sus callbacks, o desactivarla. Reemplazar coincidencias es una elección explícita por bind. Super + S y Super + Shift + S conservan tus acciones del espacio especial. La rueda ajusta volumen, micrófono o brillo en su módulo; el clic central silencia volumen o micrófono; el botón central sobre multimedia reproduce/pausa y el botón derecho sobre un módulo abre su gestión dentro de configuración.
 
 ```sh
 hyprlarp settings
@@ -356,3 +371,5 @@ El bloqueo utiliza la autenticación de `hyprlock`; HyprLarp no recibe ni almace
 Código, iconos y fondos incluidos bajo [MIT](LICENSE).
 
 La revisión de recursos, seguridad, instalación y resultados de validación está en [docs/review.md](docs/review.md). El portapapeles limita cada captura a 16 MiB antes de entregarla a cliphist y usa memoria anónima, sin archivos temporales intermedios. Las miniaturas aceptan formatos raster reconocidos y tienen límites de proceso. Los datos internos usan directorios privados y archivos de estado de modo 600.
+
+La guía de [binds actuales y personalizados](docs/binds.md) detalla el preludio, la transferencia de Noctalia y la edición sin reescribir tu configuración de Hyprland.

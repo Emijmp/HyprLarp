@@ -35,6 +35,9 @@ def _install(locations, dry_run=False):
       'launcher': '#!/bin/sh\nexec ' + shlex.quote(str(locations.app / 'bin/hyprlarp')) + ' "$@"\n',
       'settings': json.dumps(settings, ensure_ascii=False, indent=2) + '\n',
       'bindings': generate_bindings(settings, executable),
+      'prelude': '-- Load before your existing binds in hyprland.lua.\n'
+        + 'local manager = dofile(' + lua_string(str(locations.app / 'config/bindings-runtime.lua')) + ')\n'
+        + 'manager.begin(' + lua_string(str(locations.app / 'config/bindings-runtime.lua')) + ')\n',
       'session': '-- Load from hyprland.lua using dofile().\n'
         + 'dofile(' + lua_string(str(config / 'bindings.lua')) + ')\n'
         + 'hl.on("hyprland.start", function()\n'
@@ -60,7 +63,8 @@ def _install(locations, dry_run=False):
     for backup in backups:
       print('Respaldo guardado: ' + str(backup))
     print('\nInstalado. Ejecuta: ' + shlex.quote(str(executable)) + ' run')
-    print('Para el inicio de Hyprland: dofile(' + lua_string(str(config / 'hyprlarp.lua')) + ')')
+    print('Antes de tus binds: dofile(' + lua_string(str(config / 'bindings-prelude.lua')) + ')')
+    print('Al final de hyprland.lua: dofile(' + lua_string(str(config / 'hyprlarp.lua')) + ')')
     print('La configuración principal de Hyprland no se ha modificado.')
   finally:
     if stage.exists():

@@ -101,6 +101,13 @@ Scope {
     repeat: true
     running: true
     onTriggered: {
+      if (Quickshell.env("HYPRLARP_SHORTCUT_CHECKS_ONLY") === "1") {
+        stop();
+        shortcutChecks.setSource(Qt.resolvedUrl("ShortcutChecks.qml"), {
+          view: settings
+        });
+        return;
+      }
       if (Quickshell.env("HYPRLARP_REVIEW_CHECKS_ONLY") === "1") {
         stop();
         reviewChecks.setSource(Qt.resolvedUrl("ReviewChecks.qml"));
@@ -333,10 +340,22 @@ Scope {
   }
   Loader {
     id: moduleChecks
-    onLoaded: item.completed.connect(() => settingsChecks.setSource(Qt.resolvedUrl("SettingsChecks.qml"), {
-        view: settings,
-        running: true
+    onLoaded: item.completed.connect(() => shortcutChecks.setSource(Qt.resolvedUrl("ShortcutChecks.qml"), {
+        view: settings
       }))
+  }
+  Loader {
+    id: shortcutChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_SHORTCUT_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+      } else
+        settingsChecks.setSource(Qt.resolvedUrl("SettingsChecks.qml"), {
+          view: settings,
+          running: true
+        });
+    })
   }
   Loader {
     id: settingsChecks

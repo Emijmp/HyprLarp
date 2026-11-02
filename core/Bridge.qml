@@ -25,6 +25,11 @@ Singleton {
     })
   property var captureDraft: null
   property var shortcutConflicts: []
+  property var shortcutState: ({
+      available: false,
+      bindings: [],
+      conflicts: []
+    })
   property int restartAttempts: 0
   property bool awaitingInitial: true
   property int settingsEditDepth: 0
@@ -311,6 +316,9 @@ Singleton {
         break;
       case "shortcut-conflicts":
         shortcutConflicts = event.data;
+        break;
+      case "shortcut-state":
+        shortcutState = event.data;
         break;
       case "app-icons":
         appIcons = Object.assign(Object.create(null), appIcons, event.data);

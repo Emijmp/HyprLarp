@@ -6,10 +6,13 @@ import "../core"
 
 RowLayout {
   id: root
-  required property string action
+  property string action: ""
+  property string value: action ? Bridge.settings.shortcuts[action] || "" : ""
+  readonly property string chordText: input.text.trim()
+  signal edited(string chord)
   property bool capturing: false
   function sync() {
-    input.text = Qt.binding(() => Bridge.settings.shortcuts[root.action]);
+    input.text = Qt.binding(() => root.value);
   }
   function startCapture() {
     capturing = true;
@@ -29,28 +32,33 @@ RowLayout {
     }
   }
   function canonical(chord) {
-    return chord.toUpperCase().replace(/MOD4/g, "SUPER").replace(/MOD1/g, "ALT").split(",").map((part, i) => i === 0 ? part.replace(/\+/g, " ").trim().split(/\s+/).filter(Boolean).sort().join(" ") : part.trim()).join(",");
+    return chord.toUpperCase().replace(/MOD4/g, "SUPER").replace(/MOD1/g, "ALT").split(",").map((part, i) => i === 0 ? part.replace(/\+/g, " ").trim().split(/\s+/).filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).sort().join(" ") : part.trim()).join(",");
+  }
+  function valid(chord) {
+    return chord.length <= 128 && /^[A-Za-z0-9_ +]*,\s*(?:[A-Za-z0-9_]+|(?:mouse|code):[0-9]+)$/.test(chord) && chord.split(",")[0].toUpperCase().replace(/\+/g, " ").trim().split(/\s+/).filter(Boolean).every(mod => ["SUPER", "SHIFT", "CTRL", "ALT", "MOD1", "MOD2", "MOD3", "MOD4", "MOD5"].includes(mod));
   }
   function commit(chord) {
     const shortcuts = Bridge.settings.shortcuts;
-    if (chord && Object.keys(shortcuts).some(name => name !== action && canonical(shortcuts[name]) === canonical(chord))) {
+    if (action && chord && (Object.keys(shortcuts).some(name => name !== action && shortcuts[name] && canonical(shortcuts[name]) === canonical(chord)) || (Bridge.settings.customBindings || []).some(entry => entry.enabled && canonical(entry.chord) === canonical(chord)))) {
       Bridge.toast("Esta combinación ya pertenece a otro atajo del shell", true);
       root.sync();
       return;
     }
-    if (chord && !/^[A-Za-z0-9_ +]*,\s*[A-Za-z0-9_]+$/.test(chord)) {
+    if (chord && !valid(chord)) {
       Bridge.toast("Formato: SUPER SHIFT, S", true);
       return;
     }
-    Bridge.configure("shortcuts", Object.assign({}, shortcuts, {
-      [action]: chord
-    }));
-    input.text = Qt.binding(() => Bridge.settings.shortcuts[root.action]);
+    if (action)
+      Bridge.configure("shortcuts", Object.assign({}, shortcuts, {
+        [action]: chord
+      }));
+    root.edited(chord);
+    root.sync();
   }
   Field {
     id: input
     Layout.preferredWidth: 215
-    text: Bridge.settings.shortcuts[root.action]
+    text: root.value
     placeholderText: root.capturing ? "Pulsa la combinación…" : "Desactivado"
     font.family: Theme.mono
     readOnly: root.capturing

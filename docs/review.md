@@ -47,7 +47,7 @@ El objetivo verificable de las optimizaciones es limitar el crecimiento con avis
 
 ## Validación
 
-Resultado final: **152 pruebas de backend correctas**, recorrido de interfaz completo (`SMOKE COMPLETE`) y vista previa ordinaria que permanece abierta. El registro de la ejecución final está en `.runtime/check-current.log`. El recorrido ampliado dispone de 90 segundos; el límite anterior de 60 segundos podía interrumpir los últimos pasos de configuración sin que hubiera un error QML.
+Resultado final: **165 pruebas de backend correctas**, recorrido de interfaz completo (`SMOKE COMPLETE`) y vista previa ordinaria que permanece abierta. El registro de la ejecución final está en `.runtime/check-current.log`. El recorrido ampliado dispone de 90 segundos; el límite anterior de 60 segundos podía interrumpir los últimos pasos de configuración sin que hubiera un error QML.
 
 `python3 tools/check.py` ejecuta las pruebas de backend y la escena completa. Incluye:
 
@@ -76,3 +76,14 @@ Este entorno bloquea sockets de Wayland y D-Bus. Las pruebas de dispositivos usa
 Los límites aplicados por el shell actúan después de la recepción de eventos nativos. No se ha realizado fuzzing ni auditoría del código C/C++ de Qt, ImageMagick, BlueZ, NetworkManager o D-Bus, ni se ha modificado su política de sistema. La verificación de dependencias no equivale a ausencia de vulnerabilidades en esos componentes.
 
 Versiones locales registradas: Python 3.14.8, Quickshell 0.3.2, Qt Declarative 6.12.0, ImageMagick 7.1.2.34, BlueZ 5.87, NetworkManager y libnm 1.58.1. Se consultaron las páginas oficiales de [ImageMagick en Arch Security](https://security.archlinux.org/package/imagemagick), [BlueZ en Arch Security](https://security.archlinux.org/package/bluez) y los [avisos del espejo de Quickshell](https://github.com/quickshell-mirror/quickshell/security/advisories). No se actualizaron paquetes del sistema.
+
+
+## Binds actuales y editor
+
+La revisión posterior sustituye el generador que hacía `hl.unbind` y añadía espacios/multimedia por un adaptador que conserva los handles nativos. El preludio se carga antes de las declaraciones del usuario y la integración se aplica al final. Los conflictos conservan el original salvo reemplazo explícito. La página Atajos permite añadir, editar, eliminar, activar/desactivar y personalizar acciones Lua sin reescribir el archivo principal.
+
+Se verificaron callbacks de pulsar/soltar, funciones Lua, bucles de espacios, submaps, aliases, herencia, restauración al eliminar una personalización, transferencia de Noctalia y escapado de comandos. La retirada del adaptador restaura los handlers y las funciones nativas; el desinstalador comprueba que la ruta corresponda a su instalación antes de retirarlo. Un fallo de recarga restaura el archivo generado anterior.
+
+El editor QML pasa altas, cambios de comando/combinación, bajas, captura, apertura del selector, deshacer/rehacer y adopción de combinaciones de Noctalia. La revisión detectó y corrigió una restricción de variables de bucle constantes de la versión local de Lua y una advertencia de altura al destruir separadores en delegados. El pase final tiene 165 pruebas de backend correctas, `SMOKE COMPLETE` y vista previa estable.
+
+También se cargó el `hyprland.lua` real del usuario entre el preludio y la integración en `Hyprland --verify-config`: 57 declaraciones registradas y cinco binds representativos comprobados (terminal, cierre, explorador y las dos acciones del scratchpad). La verificación terminó con `config ok` y se comprobó por hash que el archivo original no cambió. No se ejecutaron sus procesos de arranque ni acciones de teclado. La prueba de pulsación y recarga con IPC sigue requiriendo la sesión real, como se detalla en [binds.md](binds.md).

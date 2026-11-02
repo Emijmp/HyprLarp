@@ -67,14 +67,14 @@
   "clipboardEnabled": true,
   "shortcuts": {
     "launcher": "SUPER, SPACE",
-    "control": "SUPER, A",
+    "control": "SUPER, M",
     "notifications": "SUPER, N",
     "clipboard": "SUPER, V",
-    "media": "SUPER, M",
+    "media": "SUPER CTRL, M",
     "calendar": "SUPER, C",
     "wallpapers": "SUPER, W",
-    "session": "SUPER, ESCAPE",
-    "settings": "SUPER SHIFT, S",
+    "session": "SUPER, X",
+    "settings": "SUPER, comma",
     "wifi": "SUPER CTRL, W",
     "bluetooth": "SUPER CTRL, B",
     "resources": "SUPER CTRL, R",
@@ -90,6 +90,8 @@
     "usb": "SUPER CTRL, U",
     "osd": "SUPER CTRL, O"
   },
+  "customBindings": [],
+  "migrateNoctaliaBinds": true,
   "barEnabled": true,
   "barZones": {
     "start": [
