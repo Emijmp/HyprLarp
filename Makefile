@@ -1,5 +1,5 @@
 .RECIPEPREFIX := >
-.PHONY: run preview settings check install
+.PHONY: run preview settings check install uninstall
 
 run:
 > ./bin/hyprlarp run
@@ -15,3 +15,6 @@ check:
 
 install:
 > ./bin/hyprlarp install
+
+uninstall:
+> ./bin/hyprlarp uninstall

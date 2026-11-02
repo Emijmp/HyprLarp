@@ -11,7 +11,7 @@ Rectangle {
   border.width: configuration.moduleBorderWidth ?? 1
   border.color: active || hovered ? Theme.border : Theme.separator
   Rectangle {
-    visible: Theme.decorated && root.active
+    visible: Theme.detail("moduleIndicators") && root.active
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     anchors.margins: root.border.width + 2

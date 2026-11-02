@@ -24,7 +24,7 @@ Son muestras cortas del comportamiento de la interfaz y del backend, sin D-Bus n
 - Espacios de trabajo: estado nativo de Hyprland, con el espacio activo de cada monitor y sin ejecutar `hyprctl` a intervalos.
 - Audio: estado y controles nativos de PipeWire; no se consulta `wpctl` periódicamente.
 - Red: lectura tras cambios de NetworkManager o al abrir Wi-Fi; buscar redes es una acción explícita. La vista previa usa una lectura de respaldo cada 60 segundos si hace falta mostrar la red.
-- Bluetooth: actualizaciones de BlueZ en el escritorio; el sondeo de respaldo solo funciona con el panel abierto en la vista previa.
+- Bluetooth: actualizaciones de BlueZ en el escritorio; sin consultas periódicas mediante bluetoothctl. El agente de PIN/confirmación vive solo durante la vinculación y la búsqueda dura como máximo 12 segundos o hasta cerrar el panel.
 - CPU/RAM/red/disco: lecturas de `/proc` y del sistema de archivos cada 2 segundos, únicamente con el módulo de recursos o un panel que las muestre.
 - Brillo: sysfs cada 2 segundos con el centro de control abierto. Batería: 30 segundos para la barra y 2 segundos con su panel abierto.
 - Tareas de lectura: una ejecución por fuente y, para eventos acumulados, una actualización pendiente. Las peticiones manuales repetidas también se agrupan.
@@ -69,3 +69,23 @@ El OSD sigue los cambios nativos de PipeWire y backlight. Su escucha de brillo e
 Las pruebas automáticas cubren la caducidad y desactivación del OSD, horarios a ambos lados de medianoche, valores de batería ausentes, unidades/ciclos, perfiles no compatibles, protección de unidades del sistema y expulsión sin forzar un desmontaje ocupado. Todas las operaciones de dispositivos de las pruebas usan servicios simulados; no montan ni expulsan unidades físicas.
 
 Muestra del 2 de noviembre de 2026, con la selección inicial de ocho módulos, paneles cerrados y Qt offscreen/software: **12.00 s**, **0 ticks de CPU contabilizados**, **0 comandos externos**, RSS final/pico **128.94 MiB**, PSS final **103.08 MiB**. Los contadores GPU no estuvieron disponibles. El informe se genera con `python3 tools/benchmark.py --seconds 12 --output .preview/performance-system-idle.json`. No incluye los servicios nativos de Wayland/D-Bus ni el filtro activado y no demuestra una reducción de memoria respecto de revisiones anteriores.
+
+
+El selector de fondos usa GridView con reutilización de las miniaturas visibles y una zona de caché de 136 px; no crea 200 imágenes a la vez. La carpeta se lee al abrir el selector, cambiar su ruta o pulsar Actualizar. Los nombres de archivo se convierten a URL local con los caracteres especiales escapados. Wi-Fi conserva el adaptador elegido y solo fuerza una búsqueda al pulsar Buscar. Las respuestas del agente Bluetooth se atienden fuera de la cola de operaciones lentas para no bloquear la confirmación de un PIN.
+
+## Revisión de recursos y seguridad · 2 de noviembre de 2026
+
+Comparación de esta revisión con el código inmediatamente anterior. Cada muestra usa los ocho módulos iniciales, tres segundos de calentamiento y doce segundos de medida con Qt offscreen/software. No se ejecutaron pruebas ni otras vistas previas en paralelo con las mediciones.
+
+| Muestra | CPU de un núcleo | RSS final/pico muestreado | PSS final | Comandos externos |
+| --- | ---: | ---: | ---: | ---: |
+| Antes, paneles cerrados | 0.00%* | 128.25 MiB | 93.32 MiB | 0 |
+| Después, paneles cerrados | 0.00%* | 129.23 MiB | 106.42 MiB | 0 |
+| Antes, Recursos abierto | 0.25% | 130.25 MiB | 94.97 MiB | 0 |
+| Después, Recursos abierto | 0.25% | 128.78 MiB | 104.53 MiB | 0 |
+
+\* No avanzaron los ticks contabilizados. No se demuestra una reducción global de RAM o CPU: el reposo ya estaba por debajo de la resolución de esta muestra y la memoria varía entre ejecuciones. PSS depende además del reparto de páginas compartidas. Los contadores GPU no estuvieron disponibles. Los resultados originales están en `.preview/review-before-idle.json`, `.preview/review-after-idle.json`, `.preview/review-before-resources.json` y `.preview/review-after-resources.json`.
+
+Las mejoras verificadas son límites de crecimiento y menos trabajo por evento: tres workers y doce tareas pendientes como máximo; lecturas y salidas de procesos acotadas; captura del portapapeles limitada antes de guardarla; hasta 64 avisos activos sin acumular callbacks al sustituirlos; escrituras agrupadas y un único vencimiento de avisos programado. La lectura ligera de la barra omite disco, red y sensores; el panel completo reutiliza los datos de disco durante diez segundos y el descubrimiento térmico durante sesenta. Las cachés de iconos tienen límite y se retiran las referencias a aplicaciones eliminadas.
+
+Los seis interruptores de decoración controlan dibujos nativos sin temporizadores propios. Los helpers gestionados terminan con el backend, incluidos los capturadores del portapapeles, evitando procesos residuales. El alcance y las comprobaciones de estas correcciones se detallan en [review.md](review.md).

@@ -12,6 +12,7 @@ import math
 import os
 from pathlib import Path
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -30,6 +31,10 @@ if __package__:
   from .udev import UdevEvents
   from .devices import Devices
   from .night import NightLight
+  from .wallpapers import EXTENSIONS, catalogue, local_path
+  from .bluetooth import BluetoothManager
+  from .wifi import WifiSecrets
+  from .safety import BoundedExecutor, JSON_LIMIT, bounded_process, private_directory, read_json, read_regular, stop_processes, idle_processes, parse_json
 else:
   from icons import IconResolver
   from layouts import BAR_KEYS, flatten, section_updates, synchronize_layout, validate_monitor_bars, validate_zones, zones_for
@@ -40,6 +45,10 @@ else:
   from udev import UdevEvents
   from devices import Devices
   from night import NightLight
+  from wallpapers import EXTENSIONS, catalogue, local_path
+  from bluetooth import BluetoothManager
+  from wifi import WifiSecrets
+  from safety import BoundedExecutor, JSON_LIMIT, bounded_process, private_directory, read_json, read_regular, stop_processes, idle_processes, parse_json
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_DEFINITIONS = json.loads((ROOT / "config/modules.json").read_text())
@@ -50,20 +59,27 @@ THEMES = set(PALETTES) | {"custom"}
 COLOR_ROLES = set(PALETTES["amoled"]) - {"name"}
 SETTINGS_ACTIONS = {"settings", "settings-undo", "settings-redo", "settings-reset", "settings-reset-section", "profile-apply", "settings-import", "theme-use"}
 SETTINGS_HISTORY_LIMIT = 50
+# 500 normalized notices can exceed the ordinary IPC budget with UTF-8 or escapes.
+# History is persisted synchronously, so this allowance never enters the work queue.
+NOTIFICATION_JSON_LIMIT = 16 * 1024 * 1024
 DEFAULTS = json.loads((ROOT / "config/defaults.json").read_text())
 COMMAND_PROFILE = os.environ.get("HYPRLARP_COMMAND_PROFILE", "")
 
 
-def atomic_text(destination: Path, value: str) -> None:
+def atomic_bytes(destination: Path, value: bytes) -> None:
   destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
   fd, temp = tempfile.mkstemp(prefix=".hyprlarp-", dir=destination.parent)
   try:
-    with os.fdopen(fd, "w") as handle:
+    with os.fdopen(fd, "wb") as handle:
       handle.write(value)
     os.replace(temp, destination)
   finally:
     if os.path.exists(temp):
       os.unlink(temp)
+
+
+def atomic_text(destination: Path, value: str) -> None:
+  atomic_bytes(destination, value.encode("utf-8"))
 
 
 def atomic_json(destination: Path, value: Any) -> None:
@@ -73,7 +89,7 @@ def atomic_json(destination: Path, value: Any) -> None:
 def number(value: Any, low: float, high: float) -> float:
   if isinstance(value, bool) or not isinstance(value, (int, float)):
     raise ValueError("Se esperaba un número")
-  if not math.isfinite(value) or not low <= value <= high:
+  if not low <= value <= high:
     raise ValueError(f"El valor debe estar entre {low} y {high}")
   return value
 
@@ -127,6 +143,9 @@ def validate_setting(key: str, value: Any) -> Any:
   elif key == "decoration":
     if value not in {"minimal", "subtle"}:
       raise ValueError("Nivel de detalle desconocido")
+  elif key == "decorationOptions":
+    if not isinstance(value, dict) or set(value) - set(DEFAULTS["decorationOptions"]) or any(not isinstance(item, bool) for item in value.values()):
+      raise ValueError("Opciones de decoración inválidas")
   elif key == "barAlignment":
     if value not in {"start", "center", "end"}:
       raise ValueError("Alineación desconocida")
@@ -197,10 +216,15 @@ def validate_setting(key: str, value: Any) -> Any:
     if not isinstance(value, str) or len(value) > 4096 or "\0" in value:
       raise ValueError("Texto inválido")
     if key == "wallpaper" and value:
-      candidate = Path(value).expanduser()
-      if not candidate.is_file() or candidate.suffix.lower() not in {".svg", ".png", ".jpg", ".jpeg", ".webp"}:
+      candidate = local_path(value)
+      if not candidate.is_file() or candidate.suffix.lower() not in EXTENSIONS:
         raise ValueError("El fondo debe ser una imagen local existente")
       value = str(candidate.resolve())
+    elif key == "wallpaperDirectory" and value:
+      candidate = local_path(value)
+      if not candidate.is_dir():
+        raise ValueError("La carpeta de fondos no existe")
+      value = str(candidate)
   return value
 
 
@@ -278,7 +302,7 @@ def validate_geometry(settings: dict) -> None:
 
 class Store:
   def __init__(self, directory: Path):
-    self.directory = directory
+    self.directory = private_directory(directory)
     self.file = directory / "settings.json"
     self.lock = threading.RLock()
     self.settings = copy.deepcopy(DEFAULTS)
@@ -287,7 +311,7 @@ class Store:
     self.redo_stack: list[dict] = []
     if self.file.exists():
       try:
-        saved = json.loads(self.file.read_text())
+        saved = read_json(self.file)
         if not isinstance(saved, dict):
           raise ValueError("La configuración no es un objeto JSON")
         saved = migrate_settings(saved)
@@ -421,21 +445,14 @@ def command(argv: list[str], *, input_text: str | None = None,
   if COMMAND_PROFILE:
     with open(COMMAND_PROFILE, "a") as profile:
       profile.write(json.dumps({"time": time.monotonic(), "command": Path(argv[0]).name}) + "\n")
-  try:
-    result = subprocess.run(argv, input=input_text, text=True, capture_output=True,
-                timeout=timeout, env={**os.environ, "LC_ALL": "C"})
-  except subprocess.TimeoutExpired as error:
-    raise RuntimeError(f"{argv[0]} no respondió a tiempo") from error
-  if check and result.returncode:
-    message = (result.stderr or result.stdout).strip()
-    raise RuntimeError(message[:350] or f"{argv[0]} terminó con error")
-  return result.stdout.strip()
+  content = input_text.encode("utf-8") if input_text is not None else b""
+  return bounded_process(argv, content=content, timeout=timeout, check=check).decode("utf-8", errors="replace").strip()
 
 
 def optional(argv: list[str], fallback: str = "") -> str:
   try:
     return command(argv)
-  except (OSError, RuntimeError):
+  except (OSError, RuntimeError, ValueError):
     return fallback
 
 
@@ -458,6 +475,25 @@ def split_nmcli(line: str) -> list[str]:
   return fields + ["".join(current)]
 
 
+def clean_history(entries, limit):
+  result = []
+  for index, entry in enumerate(entries[:limit]):
+    if not isinstance(entry, dict):
+      continue
+    item = {}
+    for key, maximum in {"token": 128, "app": 128, "appId": 128, "summary": 256, "body": 2048, "icon": 1024}.items():
+      item[key] = entry.get(key, "")[:maximum] if isinstance(entry.get(key), str) else ""
+    item["app"] = item["app"] or "Aplicación"
+    item["token"] = item["token"] or "stored:" + str(index)
+    item["id"] = entry.get("id", 0) if isinstance(entry.get("id"), int) and not isinstance(entry["id"], bool) else 0
+    stamp = entry.get("time", 0)
+    item["time"] = stamp if isinstance(stamp, (int, float)) and not isinstance(stamp, bool) and 0 <= stamp <= 8640000000000000 else 0
+    item["urgency"] = entry.get("urgency", 1) if entry.get("urgency") in (0, 1, 2) else 1
+    item["read"] = entry.get("read") is True
+    result.append(item)
+  return result
+
+
 def parse_networks(output: str) -> list[dict]:
   networks = {}
   for line in output.splitlines():
@@ -470,9 +506,10 @@ def parse_networks(output: str) -> list[dict]:
           "connected": active == "*", "interface": interface}
     except ValueError:
       continue
-    old = networks.get(ssid)
+    key = (ssid, interface)
+    old = networks.get(key)
     if old is None or item["connected"] or (not old["connected"] and item["signal"] > old["signal"]):
-      networks[ssid] = item
+      networks[key] = item
   return sorted(networks.values(), key=lambda item: (not item["connected"], -item["signal"]))
 
 
@@ -524,12 +561,17 @@ class Metrics:
   def __init__(self):
     self.previous_cpu: tuple[int, int] | None = None
     self.previous_network: tuple[float, int, int] | None = None
+    self.disk_sample = {}
+    self.disk_at = 0
+    self.thermal_path = None
+    self.thermal_at = 0
 
-  def read(self) -> dict:
+  def read(self, detailed=True) -> dict:
     data: dict[str, Any] = {"cpu": None, "memory": 0, "memoryUsed": 0, "memoryTotal": 0,
                 "disk": 0, "temperature": None, "upload": 0, "download": 0}
     try:
-      times = [int(x) for x in Path("/proc/stat").read_text().splitlines()[0].split()[1:9]]
+      with Path("/proc/stat").open() as cpu:
+        times = [int(x) for x in cpu.readline().split()[1:9]]
       total, idle = sum(times), times[3] + times[4]
       if self.previous_cpu:
         delta = total - self.previous_cpu[0]
@@ -539,9 +581,14 @@ class Metrics:
       data["memoryTotal"] = round(memory["MemTotal"] / 1024**2, 1)
       data["memoryUsed"] = round((memory["MemTotal"] - memory["MemAvailable"]) / 1024**2, 1)
       data["memory"] = round(100 * (1 - memory["MemAvailable"] / memory["MemTotal"]), 1)
-      disk = shutil.disk_usage(Path.home())
-      data["disk"] = round(100 * disk.used / disk.total, 1)
-      data["diskFree"] = round(disk.free / 1024**3, 1)
+      if not detailed:
+        return {key: data[key] for key in ("cpu", "memory", "memoryUsed", "memoryTotal")}
+      now = time.monotonic()
+      if not self.disk_sample or now - self.disk_at >= 10:
+        disk = shutil.disk_usage(Path.home())
+        self.disk_sample = {"disk": round(100 * disk.used / disk.total, 1), "diskFree": round(disk.free / 1024**3, 1)}
+        self.disk_at = now
+      data.update(self.disk_sample)
       data["uptime"] = int(float(Path("/proc/uptime").read_text().split()[0]))
       received, sent = 0, 0
       for line in Path("/proc/net/dev").read_text().splitlines()[2:]:
@@ -557,11 +604,12 @@ class Metrics:
         data["download"] = max(0, round((received - self.previous_network[1]) / elapsed / 1024))
         data["upload"] = max(0, round((sent - self.previous_network[2]) / elapsed / 1024))
       self.previous_network = (now, received, sent)
-      for zone in sorted(Path("/sys/class/thermal").glob("thermal_zone*")):
-        kind = (zone / "type").read_text().strip()
-        if kind in {"x86_pkg_temp", "cpu-thermal", "k10temp", "acpitz"}:
-          data["temperature"] = round(int((zone / "temp").read_text()) / 1000)
-          break
+      if now - self.thermal_at >= 60 or self.thermal_at == 0:
+        self.thermal_at = now
+        self.thermal_path = next((zone / "temp" for zone in sorted(Path("/sys/class/thermal").glob("thermal_zone*"))
+          if (zone / "type").read_text().strip() in {"x86_pkg_temp", "cpu-thermal", "k10temp", "acpitz"}), None)
+      if self.thermal_path:
+        data["temperature"] = round(int(self.thermal_path.read_text()) / 1000)
     except (OSError, ValueError, KeyError, IndexError):
       pass
     return data
@@ -639,7 +687,6 @@ class Service:
     self.snapshots = {}
     self.watchers: list[subprocess.Popen] = []
     self.watcher_lock = threading.Lock()
-    self.scan_process: subprocess.Popen | None = None
     self.output_names = None
     self.active_panel = ""
     self.configuration_focused = False
@@ -650,11 +697,13 @@ class Service:
     self.pending_refresh = {}
     self.icon_resolver = None
     self.icon_lock = threading.Lock()
-    self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+    self.executor = BoundedExecutor(max_workers=3, pending=12)
     self.features = Features(self, sys.modules[__name__])
     self.clipboard_manager = Clipboard(self, sys.modules[__name__])
     self.captures = Captures(self, sys.modules[__name__])
     self.devices = Devices(self)
+    self.bluetooth_manager = BluetoothManager(self)
+    self.wifi_secrets = WifiSecrets()
     self.night = NightLight(self, sys.modules[__name__])
     self.backlight = UdevEvents("backlight", lambda: self.queue_refresh("brightness-event", lambda: self.refresh_system(brightness=True), latest=True))
 
@@ -690,74 +739,50 @@ class Service:
           current = self.pending_refresh.pop(name, None) if not self.stopping.is_set() else None
           if current is None:
             self.refreshing.discard(name)
-    self.executor.submit(run)
+    try:
+      self.executor.submit(run)
+    except RuntimeError:
+      with self.refresh_lock:
+        self.refreshing.discard(name)
+        self.pending_refresh.pop(name, None)
+      return False
     return True
 
   def refresh_network(self, rescan: bool = False) -> None:
     with self.network_lock:
-      if rescan and not self.preview:
-        optional(["nmcli", "device", "wifi", "rescan"])
-      output = optional(["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY,DEVICE", "device", "wifi", "list", "--rescan", "no"])
-      self.networks = parse_networks(output)
-      enabled = optional(["nmcli", "radio", "wifi"]) == "enabled"
-      connections = optional(["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device"])
-      ethernet = any(fields[0] == "ethernet" and fields[1] == "connected"
-             for fields in map(split_nmcli, connections.splitlines()) if len(fields) >= 2)
-      self.emit_changed("network", {"available": bool(shutil.which("nmcli")), "enabled": enabled,
-                 "ethernet": ethernet, "networks": self.networks,
-                 "ssid": next((x["ssid"] for x in self.networks if x["connected"]), "")})
+      try:
+        output = command(["nmcli", "--wait", "15", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY,DEVICE", "device", "wifi", "list", "--rescan", "yes" if rescan and not self.preview else "no"], timeout=20)
+        self.networks = parse_networks(output)
+        enabled = command(["nmcli", "radio", "wifi"]) == "enabled"
+        connections = command(["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device"])
+        ethernet = any(fields[0] == "ethernet" and fields[1] == "connected"
+          for fields in map(split_nmcli, connections.splitlines()) if len(fields) >= 2)
+        self.emit_changed("network", {"available": True, "enabled": enabled, "error": "",
+          "ethernet": ethernet, "networks": self.networks,
+          "ssid": next((x["ssid"] for x in self.networks if x["connected"]), "")})
+      except (OSError, RuntimeError) as error:
+        self.networks = []
+        self.emit_changed("network", {"available": False, "enabled": False, "ethernet": False,
+          "networks": [], "ssid": "", "error": "NetworkManager no está disponible: " + str(error)})
 
   def refresh_bluetooth(self) -> None:
-    controller = optional(["bluetoothctl", "show"])
-    if not controller:
-      self.emit_changed("bluetooth", {"available": False, "enabled": False, "devices": []})
-      return
-    properties = {}
-    for field in ("Connected", "Paired", "Trusted"):
-      properties[field] = {match[1].upper() for line in optional(["bluetoothctl", "devices", field]).splitlines()
-                 if (match := re.match(r"Device ([0-9A-Fa-f:]{17}) ", line))}
-    devices = []
-    for line in optional(["bluetoothctl", "devices"]).splitlines()[:40]:
-      match = re.match(r"Device ([0-9A-Fa-f:]{17}) (.+)", line)
-      if not match:
-        continue
-      address, name = match.groups()
-      devices.append({"address": address, "name": name,
-              "connected": address.upper() in properties["Connected"],
-              "paired": address.upper() in properties["Paired"],
-              "trusted": address.upper() in properties["Trusted"]})
-    self.emit_changed("bluetooth", {"available": True, "enabled": "Powered: yes" in controller,
-                "devices": sorted(devices, key=lambda x: (not x["connected"], not x["paired"], x["name"]))})
+    self.bluetooth_manager.refresh()
 
   def refresh_clipboard(self) -> None:
     self.clipboard_manager.refresh()
 
   def refresh_wallpapers(self) -> None:
     directory = self.store.settings["wallpaperDirectory"]
-    locations = [ROOT / "assets/wallpapers"]
-    if directory:
-      locations.append(Path(directory).expanduser())
-    else:
-      pictures = optional(["xdg-user-dir", "PICTURES"], str(Path.home() / "Pictures"))
-      locations.append(Path(pictures) / "Wallpapers")
-    images = []
-    for location in locations:
-      try:
-        for candidate in sorted(location.iterdir()):
-          if candidate.is_file() and candidate.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".svg"}:
-            images.append({"name": candidate.stem.replace("-", " ").title(),
-                   "path": str(candidate.resolve()), "url": candidate.resolve().as_uri()})
-            if len(images) >= 200:
-              break
-      except OSError:
-        continue
+    pictures = optional(["xdg-user-dir", "PICTURES"], str(Path.home() / "Pictures")) if not directory else str(Path.home() / "Pictures")
+    images, state = catalogue(directory, ROOT / "assets/wallpapers", Path(pictures) / "Wallpapers")
+    self.emit_changed("wallpaper-state", state)
     self.emit_changed("wallpapers", images)
 
   def refresh_system(self, metrics: bool = False, brightness: bool = False, battery: bool = False) -> None:
     # CPU/memory, backlight and battery are small local reads; no subprocesses.
     with self.system_lock:
       if metrics:
-        self.system.update(self.metrics.read())
+        self.system.update(self.metrics.read(detailed=self.active_panel in {"resources", "control"}))
       if brightness:
         self.system.update(brightness_state())
       if battery:
@@ -766,8 +791,8 @@ class Service:
 
   def load_history(self) -> None:
     try:
-      history = json.loads((self.store.directory / "notifications.json").read_text())
-      self.emit("history", history if isinstance(history, list) else [])
+      history = read_json(self.store.directory / "notifications.json", limit=NOTIFICATION_JSON_LIMIT)
+      self.emit("history", clean_history(history, self.store.settings["notificationHistoryLimit"]) if isinstance(history, list) else [])
     except (OSError, ValueError):
       self.emit("history", [])
 
@@ -781,7 +806,7 @@ class Service:
         self.watchers.clear()
       elif not self.watchers and shutil.which("wl-paste") and shutil.which("cliphist"):
         for mime in ["text", "image"]:
-          self.watchers.append(subprocess.Popen(["wl-paste", "--type", mime, "--watch", "cliphist", "store"],
+          self.watchers.append(subprocess.Popen([sys.executable, str(ROOT / "backend/child.py"), str(os.getpid()), "wl-paste", "--type", mime, "--watch", sys.executable, str(ROOT / "backend/clipboard_store.py")],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
 
   def sync_hardware(self):
@@ -880,6 +905,9 @@ class Service:
       if self.devices.handle(action, data):
         self.emit("done", {"action": action})
         return
+      if self.bluetooth_manager.handle(action, data):
+        self.emit("done", {"action": action})
+        return
       if action == "night-sync":
         self.night.sync(force=data.get("force") is True)
         return
@@ -896,16 +924,13 @@ class Service:
       if action == "history":
         if not isinstance(data, list) or len(data) > 500:
           raise ValueError("Historial inválido")
-        cleaned = []
-        for item in data[:self.store.settings["notificationHistoryLimit"]]:
-          if not isinstance(item, dict):
-            continue
-          cleaned.append({key: value for key, value in item.items()
-                  if key in {"token", "id", "app", "appId", "summary", "body", "time", "urgency", "icon", "read"}
-                  and isinstance(value, (str, int, float, bool))})
+        cleaned = clean_history(data, self.store.settings["notificationHistoryLimit"])
         atomic_json(self.store.directory / "notifications.json", cleaned)
         return
       if action == "panel":
+        if self.active_panel == "bluetooth" and data.get("name") != "bluetooth":
+          self.bluetooth_manager.cancel()
+          self.bluetooth_manager.stop_scan()
         self.active_panel = str(data.get("name", ""))
         self.sync_hardware()
         self.wakeup.set()
@@ -940,8 +965,7 @@ class Service:
              "clipboard": self.refresh_clipboard, "wallpapers": self.refresh_wallpapers}
         if name not in refresh:
           raise ValueError("Panel desconocido")
-        if not (self.native_services and name == "bluetooth"):
-          refresh[name]()
+        refresh[name]()
         self.emit("done", {"action": action})
         return
       if self.preview:
@@ -955,22 +979,30 @@ class Service:
         command(["brightnessctl", "set", f"{value}%"])
         self.refresh_system(brightness=True)
       elif action == "wifi-power":
+        if not isinstance(data.get("enabled"), bool):
+          raise ValueError("Estado Wi-Fi inválido")
         command(["nmcli", "radio", "wifi", "on" if data.get("enabled") is True else "off"])
         self.refresh_network()
       elif action == "wifi-connect":
         ssid = data.get("ssid")
         if not isinstance(ssid, str) or not ssid or len(ssid.encode()) > 32:
           raise ValueError("SSID inválido")
-        argv = ["nmcli", "--wait", "25", "device", "wifi", "connect", ssid]
+        interface = data.get("interface") or next((entry["interface"] for entry in self.networks if entry["ssid"] == ssid), "")
+        if not isinstance(interface, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,32}", interface):
+          raise ValueError("Selecciona una red con un adaptador Wi-Fi disponible")
+        argv = ["nmcli", "--wait", "45", "device", "wifi", "connect", ssid, "ifname", interface]
         password = data.get("password", "")
-        if password:
-          if not isinstance(password, str) or len(password) > 256:
-            raise ValueError("Contraseña inválida")
-          argv += ["password", password]
+        if not isinstance(password, str) or len(password) > 256 or "\0" in password:
+          raise ValueError("Contraseña inválida")
         try:
-          command(argv, timeout=30)
-        except RuntimeError:
-          raise RuntimeError("No se pudo conectar. Revisa la contraseña o abre el editor de conexiones.") from None
+          if password:
+            security = next((entry["security"] for entry in self.networks if entry["ssid"] == ssid and entry["interface"] == interface), "")
+            profile = self.wifi_secrets.prepare(ssid, interface, password, security)
+            argv = ["nmcli", "--wait", "45", "connection", "up", "uuid", profile, "ifname", interface]
+          command(argv, timeout=50)
+        except (RuntimeError, ValueError) as error:
+          detail = str(error).replace(password, "[oculta]") if password else str(error)
+          raise RuntimeError("No se pudo conectar a la red: " + detail) from None
         self.refresh_network()
       elif action == "wifi-disconnect":
         interface = data.get("interface", "")
@@ -978,22 +1010,6 @@ class Service:
           raise ValueError("Interfaz inválida")
         command(["nmcli", "device", "disconnect", interface])
         self.refresh_network()
-      elif action == "bluetooth-power":
-        command(["bluetoothctl", "power", "on" if data.get("enabled") is True else "off"])
-        if not self.native_services:
-          self.refresh_bluetooth()
-      elif action == "bluetooth-scan":
-        if self.scan_process is None or self.scan_process.poll() is not None:
-          self.scan_process = subprocess.Popen(["bluetoothctl", "--timeout", "12", "scan", "on"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-      elif action in {"bluetooth-connect", "bluetooth-disconnect", "bluetooth-pair"}:
-        address = data.get("address", "")
-        if not re.fullmatch(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", address):
-          raise ValueError("Dirección Bluetooth inválida")
-        verb = action.split("-", 1)[1]
-        command(["bluetoothctl", "--timeout", "20", verb, address], timeout=25)
-        if not self.native_services:
-          self.refresh_bluetooth()
       elif action == "workspace":
         workspace = int(number(data.get("id"), 1, 99))
         command(["hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {workspace} }})"])
@@ -1033,6 +1049,7 @@ class Service:
         raise ValueError("Acción desconocida")
       self.emit("done", {"action": action})
     except (OSError, ValueError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
+      self.emit("action-error", {"action": action, "message": str(error)})
       self.emit("error", str(error))
       if action in SETTINGS_ACTIONS:
         self.emit("settings-rejected", {"action": action})
@@ -1066,8 +1083,7 @@ class Service:
       if directory is None:
         raise RuntimeError("No se encontró la configuración de suspensión")
       expected = str(directory / "hypridle.conf")
-      processes = optional(["pgrep", "-a", "-u", str(os.getuid()), "-x", "hypridle"])
-      managed_idle = any(expected in shlex.split(line)[1:] for line in processes.splitlines())
+      managed_idle = next(idle_processes(expected), None) is not None
       if not managed_idle or not Path(expected).is_file():
         raise RuntimeError("Inicia hypridle con el archivo hypridle.conf instalado por HyprLarp para suspender con bloqueo")
       command(["systemctl", "suspend"])
@@ -1092,42 +1108,62 @@ class Service:
     polling = threading.Thread(target=self.poll, daemon=True)
     polling.start()
     try:
-      for line in sys.stdin:
+      while True:
+        stream = getattr(sys.stdin, "buffer", sys.stdin)
+        line = stream.readline(NOTIFICATION_JSON_LIMIT + 1)
+        if not line:
+          break
         try:
-          request = json.loads(line)
-          if not isinstance(request, dict):
+          if len(line) > NOTIFICATION_JSON_LIMIT:
+            newline = b"\n" if isinstance(line, bytes) else "\n"
+            while line and not line.endswith(newline):
+              line = stream.readline(NOTIFICATION_JSON_LIMIT + 1)
+            raise ValueError("La petición supera 16 MiB")
+          request = parse_json(line)
+          if not isinstance(request, dict) or not isinstance(request.get("action"), str) or len(request["action"]) > 64:
             raise ValueError("La petición no es un objeto JSON")
+          if request["action"] != "history" and len(line) > JSON_LIMIT:
+            raise ValueError("La petición supera 2 MiB")
           # Serialize persistence; slow device operations use workers.
-          if request.get("action") in SETTINGS_ACTIONS | {"settings-context", "history", "panel", "network-status", "outputs", "profile-save", "profile-delete", "theme-save", "theme-delete", "settings-export"}:
+          if request.get("action") in SETTINGS_ACTIONS | {"settings-context", "history", "panel", "network-status", "outputs", "profile-save", "profile-delete", "theme-save", "theme-delete", "settings-export", "bluetooth-respond", "bluetooth-cancel"}:
             self.action(request)
           elif request.get("action") == "refresh":
             data = request.get("data", {})
             name = data.get("name") if isinstance(data, dict) else None
             if isinstance(name, str) and name in {"wifi", "bluetooth", "clipboard", "wallpapers"}:
-              self.queue_refresh("manual-" + name, lambda request=request: self.action(request))
+              if not self.queue_refresh("manual-" + name, lambda request=request: self.action(request)):
+                self.emit("idle", {"action": "refresh"})
             else:
               self.action(request)
           else:
-            self.executor.submit(self.action, request)
-        except ValueError as error:
+            try:
+              self.executor.submit(self.action, request)
+            except RuntimeError:
+              self.emit("idle", {"action": request["action"]})
+              raise
+        except (ValueError, TypeError, RuntimeError) as error:
           self.emit("error", str(error))
     finally:
       self.serving = False
       self.stopping.set()
       self.wakeup.set()
+      stop_processes()
       self.devices.stop()
+      self.bluetooth_manager.close()
       self.backlight.stop()
       self.night.close()
       with self.watcher_lock:
         for watcher in self.watchers:
           if watcher.poll() is None:
             watcher.terminate()
-      if self.scan_process and self.scan_process.poll() is None:
-        self.scan_process.terminate()
       self.executor.shutdown(wait=False, cancel_futures=True)
 
 
 def main() -> None:
+  def terminate(signum, frame):
+    raise SystemExit(0)
+  signal.signal(signal.SIGTERM, terminate)
+  os.umask(0o077)
   parser = argparse.ArgumentParser()
   parser.add_argument("--preview", action="store_true")
   parser.add_argument("--settings-only", action="store_true")

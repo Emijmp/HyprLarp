@@ -6,6 +6,7 @@ import "fuzzy.js" as Fuzzy
 Singleton {
   id: root
   readonly property bool showIcons: Bridge.settings.showAppIcons === true
+  readonly property var favoriteIds: new Set(Bridge.launcher.favorites || [])
   onShowIconsChanged: if (showIcons)
     resolveTimer.restart()
   // Sorted once per desktop-entry update, rather than once per keystroke.
@@ -14,7 +15,15 @@ Singleton {
         name: Fuzzy.normalize(app.name),
         keywords: Fuzzy.normalize(app.name + " " + app.genericName + " " + app.comment)
       })).sort((a, b) => a.app.name.localeCompare(b.app.name))
-  onIndexChanged: resolveTimer.restart()
+  onIndexChanged: {
+    const active = new Set(index.map(entry => entry.app.icon));
+    const next = Object.create(null);
+    for (const name of Object.keys(Bridge.appIcons))
+      if (active.has(name))
+        next[name] = Bridge.appIcons[name];
+    Bridge.appIcons = next;
+    resolveTimer.restart();
+  }
   Component.onCompleted: resolveTimer.restart()
   function icon(name) {
     if (name.startsWith("/"))
@@ -35,7 +44,7 @@ Singleton {
     }
   }
   function favorite(app) {
-    return (Bridge.launcher.favorites || []).includes(app.id);
+    return favoriteIds.has(app.id);
   }
   function toggleFavorite(app) {
     Bridge.perform("launcher-favorite", {
@@ -50,7 +59,7 @@ Singleton {
   function search(text, filter) {
     const query = Fuzzy.normalize(text).trim().slice(0, 128);
     const recent = Bridge.launcher.recent || [];
-    const recency = {};
+    const recency = Object.create(null);
     recent.forEach((entry, index) => recency[entry.id] = recent.length - index);
     return index.map(entry => ({
           app: entry.app,

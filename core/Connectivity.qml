@@ -27,6 +27,9 @@ Singleton {
   readonly property var bluetoothState: ({
       available: adapter !== null,
       enabled: adapter !== null && adapter.enabled,
+      adapter: adapter ? adapter.dbusPath : "",
+      discovering: adapter !== null && adapter.discovering,
+      error: "",
       devices: adapter ? adapter.devices.values.map(d => ({
             address: d.address,
             name: d.name,

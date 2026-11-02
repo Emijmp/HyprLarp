@@ -101,6 +101,16 @@ Scope {
     repeat: true
     running: true
     onTriggered: {
+      if (Quickshell.env("HYPRLARP_REVIEW_CHECKS_ONLY") === "1") {
+        stop();
+        reviewChecks.setSource(Qt.resolvedUrl("ReviewChecks.qml"));
+        return;
+      }
+      if (Quickshell.env("HYPRLARP_CONNECTION_CHECKS_ONLY") === "1") {
+        stop();
+        connectionChecks.setSource(Qt.resolvedUrl("ConnectionChecks.qml"));
+        return;
+      }
       if (root.step < root.panels.length) {
         const name = root.panels[root.step];
         const entry = ModuleCatalog.definitions.find(entry => entry.kind === "panel" && entry.target === name);
@@ -297,9 +307,29 @@ Scope {
   }
   Loader {
     id: featureChecks
-    onLoaded: item.completed.connect(() => moduleChecks.setSource(Qt.resolvedUrl("ModuleChecks.qml"), {
-        view: settings
-      }))
+    onLoaded: item.completed.connect(() => connectionChecks.setSource(Qt.resolvedUrl("ConnectionChecks.qml")))
+  }
+  Loader {
+    id: connectionChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_CONNECTION_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+      } else
+        reviewChecks.setSource(Qt.resolvedUrl("ReviewChecks.qml"));
+    })
+  }
+  Loader {
+    id: reviewChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_REVIEW_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+      } else
+        moduleChecks.setSource(Qt.resolvedUrl("ModuleChecks.qml"), {
+          view: settings
+        });
+    })
   }
   Loader {
     id: moduleChecks

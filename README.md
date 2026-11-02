@@ -36,8 +36,8 @@ Solo puede haber un servidor de notificaciones de escritorio a la vez. Si tu ses
 | Barra flotante | En todos los monitores; cuatro posiciones, ajustes por monitor y zonas inicio/centro/final; módulos con fondos individuales que se pueden añadir, quitar y reordenar arrastrando o con flechas. Espacios activos por monitor, actualizados mediante eventos de Hyprland. |
 | Launcher | Centrado en la pantalla donde lo abres, con iconos de aplicaciones `.desktop`, búsqueda con tolerancia a errores, favoritos, recientes y navegación con flechas y Enter. Usa el índice nativo de Quickshell. |
 | Centro de control | Una columna de texto con Wi-Fi, Bluetooth, No molestar, volumen, brillo y acciones del sistema. Multimedia aparece solo si hay un reproductor. |
-| Wi-Fi | Redes disponibles, búsqueda, conexiones guardadas o con contraseña, conexión y desconexión mediante NetworkManager. |
-| Bluetooth | Encendido, búsqueda, vinculación simple, conexión y desconexión con BlueZ. |
+| Wi-Fi | Redes disponibles, búsqueda, conexiones guardadas o con contraseña y adaptador elegido; formulario visible y errores detallados mediante NetworkManager. |
+| Bluetooth | Encendido, búsqueda acotada, conexión y desconexión con BlueZ. Vinculación con PIN, código de teclado o confirmación dentro del panel; recuerda y conecta el dispositivo. |
 | Notificaciones | Avisos, acciones, No molestar, búsqueda, grupos y filtro por aplicación; reglas de avisos, historial y sonido por aplicación. |
 | Portapapeles | Texto e imágenes con `wl-paste` / `cliphist`; fijados persistentes, miniaturas, pausa, búsqueda, caducidad opcional y limpieza sin borrar fijados. |
 | Multimedia | Reproductores MPRIS, reproducción, anterior/siguiente, selección de reproductor y posición si la aplicación lo permite. |
@@ -50,13 +50,15 @@ Solo puede haber un servidor de notificaciones de escritorio a la vez. Si tu ses
 | OSD | Indicadores de volumen, micrófono y brillo; posición superior/inferior y duración configurables. No aparecen al iniciar ni al sustituir un dispositivo. |
 | Modo nocturno | Filtro cálido con hyprsunset, de 1000 a 6500 K, activación manual o por horario que admite cruzar medianoche. Desactivado inicialmente. |
 | USB | Lista de periféricos conectados; montar, abrir, desmontar y expulsar unidades de datos con UDisks. Sin montaje automático. |
-| Fondos | Fondos lisos de los tres temas, miniaturas y carpeta personal; el shell dibuja el fondo en cada monitor. |
+| Fondos | Selector de carpeta, ruta editable, miniaturas y fondos del tema; imagen elegida en cada monitor. Admite espacios, Unicode y caracteres especiales en la ruta. |
 | Configuración | Buscador, campos numéricos, selector RGB, seis temas y paletas propias; perfiles, importar/exportar y reset por sección. Deshacer, rehacer y restablecer solo desde esta ventana. |
 | Audio | Selección nativa de salida/entrada, micrófono, silencio y volumen por aplicación con PipeWire. |
 | Bandeja | Módulo opcional con iconos ocultables y menús contextuales nativos. |
 | Presentación | Suprime avisos y sonidos e inhibe el reposo automático mediante Wayland mientras está activo. |
 
-Los datos ausentes aparecen como no disponibles. No se simulan conexiones, canciones ni dispositivos. El soporte de reproducción y búsqueda de posición depende de las capacidades MPRIS de cada aplicación. Las redes empresariales/VPN usan `nm-connection-editor` y el emparejamiento Bluetooth con PIN usa `blueman-manager`, accesibles desde los paneles. El botón Mezclador abre el panel nativo de audio.
+Los datos ausentes aparecen como no disponibles. No se simulan conexiones, canciones ni dispositivos. El soporte de reproducción y búsqueda de posición depende de las capacidades MPRIS de cada aplicación. Las redes empresariales/VPN usan `nm-connection-editor`; el gestor externo `blueman-manager` sigue disponible como opción. El botón Mezclador abre el panel nativo de audio.
+
+En **Fondos**, pulsa **Elegir carpeta…** o escribe una ruta absoluta o con `~/` y pulsa **Aplicar ruta** o Enter. Los mismos controles están en **Configuración → Fondos**; desde la barra, Elegir carpeta abre esa página y su explorador. Se buscan PNG, JPG, JPEG, WEBP, SVG y BMP directamente en esa carpeta, junto con los fondos incluidos; **Actualizar** vuelve a leerla. Las miniaturas se crean al desplazarte y el catálogo se limita a 200 imágenes. **Usar fondo del tema** recupera el fondo liso. Deshacer los cambios sigue siendo exclusivo de configuración.
 
 Capturas de la implementación: [información de batería](docs/battery.png), [OSD de prueba](docs/osd.png), [modo nocturno](docs/night-light.png) y [preferencias del OSD](docs/general-settings.png).
 
@@ -129,6 +131,10 @@ Abre **Configuración → Barra** con el botón derecho sobre la barra o con `./
 
 En **Configuración → Apariencia → Detalles visuales**, elige **Sutil** para los pequeños trazos, indicadores y remates geométricos, o **Mínimo** para eliminarlos. Se conservan el negro AMOLED, los bordes sólidos, las esquinas pequeñas y los iconos monocromos. No se añaden sombras, brillos, degradados ni animaciones permanentes.
 
+![Controles independientes de decoración en Apariencia](docs/decoration-settings.png)
+
+En esa página puedes activar o quitar por separado los remates de paneles, marcas de sección, indicadores de módulos, líneas divisorias, iconos de cabecera y marcas de notificaciones. **Mínimo** desactiva esos detalles sin borrar las elecciones; **Sutil** las recupera. Son ajustes de configuración con Deshacer/Rehacer y reset de Apariencia. El recuadro del workspace activo y las señales funcionales de selección se mantienen.
+
 En **Configuración → Barra / Módulos**, selecciona Todos para los valores base o una salida concreta. Cada monitor hereda los valores base salvo sus ajustes explícitos; **Heredar todo** elimina esa personalización. Los monitores desconectados conservan sus preferencias.
 
 Asigna los módulos a Inicio, Centro o Final; arrastra el tirador hasta un punto de inserción o usa las flechas. El reloj queda centrado si hay espacio; una barra demasiado corta permite desplazar el contenido sin superponer las zonas. **Quitar** y **Añadir** controlan qué módulos están presentes. Se puede dejar vacía y seguir abriendo los ajustes con el botón derecho. La opacidad se ajusta por módulo o de forma general. También puedes modificar la opacidad del fondo, el padding horizontal/vertical, el borde de 0–4 px y el radio de 0–8 px de los módulos. El grosor de la barra aumenta si hace falta para que el contenido no se corte.
@@ -178,13 +184,13 @@ Editores opcionales:
 sudo pacman -S nm-connection-editor blueman pavucontrol
 ```
 
-Para energía, almacenamiento USB y modo nocturno:
+Para Bluetooth integrado, energía, almacenamiento USB y modo nocturno:
 
 ```sh
-sudo pacman -S power-profiles-daemon udisks2 python-gobject hyprsunset
+sudo pacman -S power-profiles-daemon udisks2 python-gobject libnm hyprsunset
 ```
 
-`python-gobject` proporciona GIO para D-Bus; es opcional para el resto del shell. La lista de periféricos USB se lee de sysfs. `doctor` comprueba las herramientas y el módulo Python, pero no confirma que los servicios estén activos. El modo nocturno gestiona una instancia propia de hyprsunset con configuración aislada; si ya tienes otra activa, muestra el conflicto y permite reintentar al cerrarla. Al salir de HyprLarp se detiene únicamente su filtro.
+`python-gobject` proporciona GIO para Wi-Fi, Bluetooth, energía y almacenamiento USB; `libnm` permite enviar las contraseñas Wi-Fi directamente a NetworkManager, sin incluirlas en argumentos de procesos. Estos paquetes son opcionales para el resto del shell. La lista de periféricos USB se lee de sysfs. `doctor` comprueba las herramientas y el módulo Python, pero no confirma que los servicios estén activos. El modo nocturno gestiona una instancia propia de hyprsunset con configuración aislada; si ya tienes otra activa, muestra el conflicto y permite reintentar al cerrarla. Al salir de HyprLarp se detiene únicamente su filtro.
 
 En **Configuración → General** puedes activar el OSD, cambiar posición/duración, probarlo y configurar el horario nocturno. El OSD automático se oculta durante Presentación; su prueba es explícita. Las unidades USB se consultan al abrir el panel o añadir el módulo y se actualizan con eventos. Expulsar pide confirmación y desmonta los volúmenes antes de apagar la unidad; si están ocupados, comunica el error sin forzar. Las unidades del sistema no ofrecen estas acciones.
 
@@ -193,17 +199,41 @@ NetworkManager, BlueZ y PipeWire deben estar funcionando en tu sesión. El front
 ## Instalar para tu usuario
 
 ```sh
-./bin/hyprlarp install --dry-run
-./bin/hyprlarp install
+./install.sh --dry-run
+./install.sh
 ```
 
 Se copia el proyecto a `~/.local/share/hyprlarp`, se crea `~/.local/bin/hyprlarp` y una entrada **Configuración de HyprLarp** en el launcher. Respeta `XDG_DATA_HOME` y `XDG_CONFIG_HOME`. La instalación conserva los ajustes válidos existentes y crea respaldos de las copias y archivos que sustituye. No edita tu archivo principal de Hyprland ni activa el shell automáticamente.
+
+La copia se prepara antes de sustituir la anterior. Los archivos reemplazados se conservan con sufijo `.backup-fecha`; ante un fallo de escritura se restauran. Un manifiesto con hashes identifica los archivos gestionados. El instalador rechaza destinos superpuestos o con enlaces simbólicos y bloquea instalaciones simultáneas. No copia `.git`, `.runtime`, `.preview`, archivos arbitrarios de la raíz ni cachés Python. No instala paquetes del sistema ni requiere sudo.
+
+Para desinstalar conservando ajustes, notificaciones y portapapeles:
+
+```sh
+./uninstall.sh --dry-run
+./uninstall.sh
+```
+
+Para quitar toda la carpeta de ajustes, incluidos historiales y respaldos internos, usa explícitamente:
+
+```sh
+./uninstall.sh --purge
+```
+
+La desinstalación detiene las instancias del shell instaladas y el hypridle que usa su archivo exacto de configuración; no detiene otros shells ni otros hypridle. Los archivos de programa modificados o ajenos y los respaldos fuera de la carpeta de ajustes se conservan. Sin `--purge`, también se conserva toda la carpeta de ajustes. Elimina el `dofile` de HyprLarp de tu `hyprland.lua` si lo añadiste: los scripts no editan ese archivo. También existen `hyprlarp install`, `hyprlarp uninstall` y `make uninstall`.
+
+Puedes probar un ciclo completo en un destino aislado con `./install.sh --prefix /tmp/hyprlarp-demo`; usa el mismo `--prefix /tmp/hyprlarp-demo` al ejecutar `uninstall.sh`. Los modos `--dry-run` no crean ni borran archivos. El bloqueo de operaciones deja un archivo vacío `.hyprlarp-install.lock` en el directorio de datos; evita competir con otra instalación y no contiene datos personales.
 
 Para iniciarlo con Hyprland, añade esto a `~/.config/hypr/hyprland.lua`:
 
 ```lua
 local config = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
-dofile(config .. "/hyprlarp/hyprlarp.lua")
+local hyprlarp = config .. "/hyprlarp/hyprlarp.lua"
+local file = io.open(hyprlarp, "r")
+if file then
+  file:close()
+  dofile(hyprlarp)
+end
 ```
 
 El archivo incluye el arranque del shell, `hypridle` y los atajos generados. Si ya gestionas `hypridle`, integra el contenido de `~/.config/hyprlarp/hypridle.conf` en tu configuración en vez de iniciar dos instancias. El botón Suspender comprueba que la instancia de `hypridle` de HyprLarp esté activa.
@@ -212,7 +242,12 @@ El aspecto de ventanas del rice es opcional:
 
 ```lua
 local data = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share")
-dofile(data .. "/hyprlarp/config/hyprland-look.lua")
+local rice = data .. "/hyprlarp/config/hyprland-look.lua"
+local file = io.open(rice, "r")
+if file then
+  file:close()
+  dofile(rice)
+end
 ```
 
 Este archivo aplica separación, bordes blancos de 1 px, esquinas rectas y desactiva las sombras del compositor. La app configura el shell; las ventanas del compositor se ajustan en ese archivo. El bloqueo recibe los colores del tema actual al abrirse, a partir de la plantilla `config/hyprlock.conf`.
@@ -291,7 +326,7 @@ core/              Estado, temas, puente, notificaciones y MPRIS
 components/        Controles e iconos vectoriales propios
 widgets/           Barra, fondo, panel flotante y configuración
 panels/            Funciones del escritorio
-backend/           Integraciones; biblioteca estándar y GIO opcional para energía/USB
+backend/           Integraciones; biblioteca estándar y GIO/libnm para dispositivos y Wi-Fi
 config/            Valores iniciales y estilos del compositor/bloqueo
 assets/            Fondos y marca originales en SVG
 tools/             Instalación y comprobación de la interfaz
@@ -304,7 +339,7 @@ make check
 python3 -m unittest discover -s tests -v
 ```
 
-La comprobación completa abre los 18 paneles, las siete páginas de configuración, las cuatro posiciones de barra, valores a cero, barras cortas, los seis temas incluidos y el personalizado con el renderizador offscreen de Qt y ajustes temporales. Comprueba la navegación de los 48 módulos, las páginas de configuración y las confirmaciones de sesión; los modos visuales Mínimo y Sutil; el selector RGB, las anotaciones, los flujos de audio y la recuperación tras terminar el backend de prueba; añadir, quitar y reordenar módulos, incluyendo una barra vacía; también deshacer/rehacer cambios pendientes y guardados, revertir un reset, agrupar sliders, conservar la paleta y aplicar colores claros personalizados. Comprueba el OSD de prueba, su caducidad y desactivación, y el historial de sus preferencias y del modo nocturno. Las pruebas de lógica cubren errores de escritura, validación de colores, límite del historial, espacios por monitor, planificación del muestreo, telemetría de batería, horarios nocturnos, perfiles compatibles y operaciones USB con servicios simulados; las del modelo de espacios usan Node si está disponible, solo para desarrollo. Los archivos Lua se verifican con `Hyprland --verify-config` cuando está instalado. El renderizado está comprobado con Quickshell 0.3.2 y la configuración con Hyprland 0.57; los cambios físicos de monitor, las conexiones, el bloqueo/PAM, la suspensión, el OSD nativo, energía, USB, el filtro nocturno y las acciones de sesión deben verificarse en una sesión real. La vista previa no valida esos servicios.
+La comprobación completa abre los 18 paneles, las siete páginas de configuración, las cuatro posiciones de barra, valores a cero, barras cortas, los seis temas incluidos y el personalizado con el renderizador offscreen de Qt y ajustes temporales. Comprueba la navegación de los 48 módulos, las páginas de configuración y las confirmaciones de sesión; los modos visuales Mínimo y Sutil; el selector RGB, las anotaciones, los flujos de audio y la recuperación tras terminar el backend de prueba; añadir, quitar y reordenar módulos, incluyendo una barra vacía; también deshacer/rehacer cambios pendientes y guardados, revertir un reset, agrupar sliders, conservar la paleta y aplicar colores claros personalizados. Comprueba el OSD de prueba, su caducidad y desactivación, el historial de sus preferencias y del modo nocturno, y elegir una carpeta e imagen con espacios y caracteres especiales hasta comprobar su renderizado. La vinculación Bluetooth, sus confirmaciones y cancelaciones se verifican con BlueZ simulado. Las pruebas de lógica cubren errores de escritura, validación de colores, límite del historial, espacios por monitor, planificación del muestreo, telemetría de batería, horarios nocturnos, perfiles compatibles y operaciones USB con servicios simulados; las del modelo de espacios usan Node si está disponible, solo para desarrollo. Los archivos Lua se verifican con `Hyprland --verify-config` cuando está instalado. El renderizado está comprobado con Quickshell 0.3.2 y la configuración con Hyprland 0.57; los cambios físicos de monitor, las conexiones, el bloqueo/PAM, la suspensión, el OSD nativo, energía, USB, el filtro nocturno y las acciones de sesión deben verificarse en una sesión real. La vista previa no valida esos servicios.
 
 El código usa indentación de **2 espacios** en QML, Python, JavaScript, JSON, Lua y configuración. `.editorconfig` y `.qmlformat.ini` conservan esta convención. Las reglas visuales están en [docs/design.md](docs/design.md).
 
@@ -319,3 +354,5 @@ El bloqueo utiliza la autenticación de `hyprlock`; HyprLarp no recibe ni almace
 - [Hyprland: configuración Lua](https://wiki.hypr.land/configuring/core/)
 
 Código, iconos y fondos incluidos bajo [MIT](LICENSE).
+
+La revisión de recursos, seguridad, instalación y resultados de validación está en [docs/review.md](docs/review.md). El portapapeles limita cada captura a 16 MiB antes de entregarla a cliphist y usa memoria anónima, sin archivos temporales intermedios. Las miniaturas aceptan formatos raster reconocidos y tienen límites de proceso. Los datos internos usan directorios privados y archivos de estado de modo 600.

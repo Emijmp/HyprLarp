@@ -13,7 +13,7 @@ Rectangle {
   border.width: toast ? 1 : 0
   border.color: Theme.border
   Rectangle {
-    visible: Theme.decorated
+    visible: Theme.detail("notificationMarks")
     x: root.padding
     y: root.padding + 5
     width: 2
@@ -26,7 +26,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.margins: root.padding
-    anchors.leftMargin: root.padding + (Theme.decorated ? 8 : 0)
+    anchors.leftMargin: root.padding + (Theme.detail("notificationMarks") ? 8 : 0)
     spacing: 6
     RowLayout {
       Label {
@@ -86,7 +86,7 @@ Rectangle {
     }
   }
   Rectangle {
-    visible: !root.toast
+    visible: !root.toast && Theme.detail("separators")
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom

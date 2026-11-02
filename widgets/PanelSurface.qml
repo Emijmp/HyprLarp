@@ -61,6 +61,13 @@ Rectangle {
     z: 2
   }
   focus: true
+  function reveal(item) {
+    const flickable = scroll.contentItem;
+    if (!item || !flickable || flickable.contentY === undefined)
+      return;
+    const point = item.mapToItem(panelLoader, 0, 0);
+    flickable.contentY = Math.max(0, Math.min(point.y - 8, scroll.contentHeight - flickable.height));
+  }
   Keys.onEscapePressed: ShellState.close()
   ColumnLayout {
     anchors.fill: parent
@@ -69,7 +76,7 @@ Rectangle {
     RowLayout {
       Layout.fillWidth: true
       Icon {
-        visible: Theme.decorated
+        visible: Theme.detail("headerIcons")
         name: ModuleCatalog.byId[root.panel] ? ModuleCatalog.byId[root.panel].icon : "grid"
         color: Theme.text
         Layout.preferredWidth: 16
@@ -108,6 +115,13 @@ Rectangle {
             item.focusSearch();
           else
             root.forceActiveFocus();
+        }
+      }
+      Connections {
+        target: panelLoader.item
+        ignoreUnknownSignals: true
+        function onRevealRequested(item) {
+          Qt.callLater(() => root.reveal(item));
         }
       }
     }

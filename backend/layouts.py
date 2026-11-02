@@ -9,7 +9,7 @@ BAR_KEYS = {"barEnabled", "barPosition", "barSize", "barMargins", "barPaddingX",
   "barZones", "moduleOpacity", "moduleBackgroundOpacity", "moduleBorderWidth", "modulePaddingX",
   "modulePaddingY", "moduleRadius", "moduleOpacities"}
 SECTIONS = {
-  "Appearance": {"decoration", "theme", "accent", "customPalette", "font", "radius", "cornerRadii", "panelOpacity", "animations"},
+  "Appearance": {"decoration", "decorationOptions", "theme", "accent", "customPalette", "font", "radius", "cornerRadii", "panelOpacity", "animations"},
   "Bar": {key for key in BAR_KEYS if key.startswith("bar") and key not in {"barModules", "barZones"}},
   "Modules": {"barModules", "barZones", "disabledModules", "moduleOpacity", "moduleOpacities",
     "moduleBackgroundOpacity", "moduleBorderWidth", "modulePaddingX", "modulePaddingY", "moduleRadius", "trayHiddenItems"},

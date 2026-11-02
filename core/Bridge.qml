@@ -79,6 +79,14 @@ Singleton {
   property var clipboard: []
   property var clipboardThumbnails: ({})
   property var wallpapers: []
+  property var wallpaperState: ({
+      directory: "",
+      browseUrl: "",
+      error: "",
+      count: 0,
+      truncated: false
+    })
+  property var bluetoothPrompt: null
   property var history: []
   property var pending: ({})
   property string message: ""
@@ -86,6 +94,7 @@ Singleton {
   property string busyAction: ""
   signal historyLoaded(var entries)
   signal actionFinished(string action)
+  signal actionFailed(string action, string reason)
   signal settingsSettled
 
   function send(action, data, source) {
@@ -304,7 +313,7 @@ Singleton {
         shortcutConflicts = event.data;
         break;
       case "app-icons":
-        appIcons = Object.assign({}, appIcons, event.data);
+        appIcons = Object.assign(Object.create(null), appIcons, event.data);
         break;
       case "settings":
         const initial = awaitingInitial;
@@ -369,6 +378,15 @@ Singleton {
         break;
       case "wallpapers":
         wallpapers = event.data;
+        break;
+      case "wallpaper-state":
+        wallpaperState = event.data;
+        break;
+      case "bluetooth-prompt":
+        bluetoothPrompt = event.data;
+        break;
+      case "action-error":
+        actionFailed(event.data.action, event.data.message);
         break;
       case "history":
         history = event.data;

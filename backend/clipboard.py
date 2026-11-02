@@ -19,18 +19,21 @@ class Clipboard:
     self.directory = service.store.directory / "clipboard"
     self.state = {"pins": {}, "seen": {}}
     try:
-      loaded = json.loads((self.directory / "index.json").read_text())
+      if self.directory.exists():
+        self.api.private_directory(self.directory)
+      loaded = self.api.read_json(self.directory / "index.json")
       if isinstance(loaded, dict) and isinstance(loaded.get("pins"), dict) and isinstance(loaded.get("seen"), dict):
         self.state = loaded
     except (OSError, ValueError):
       pass
     self.state["pins"] = {key: value for key, value in self.state["pins"].items()
       if re.fullmatch(r"[a-f0-9]{64}", key) and isinstance(value, dict) and isinstance(value.get("text"), str)}
+    self.state["pins"] = {key: {"text": value["text"][:512], "image": bool(value.get("image"))} for key, value in list(self.state["pins"].items())[:50]}
     self.state["seen"] = {key: value for key, value in self.state["seen"].items()
       if key.isdecimal() and isinstance(value, (int, float))}
 
   def save(self):
-    self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    self.api.private_directory(self.directory)
     self.api.atomic_json(self.directory / "index.json", self.state)
 
   @staticmethod
@@ -46,20 +49,20 @@ class Clipboard:
 
   def decode(self, data):
     if data.get("pin"):
+      self.api.private_directory(self.directory)
       ident = self.pin_id(data["pin"])
-      content = (self.directory / (ident + ".data")).read_bytes()
+      content = self.api.read_regular(self.directory / (ident + ".data"), self.LIMIT)
     else:
       raw = data.get("raw", "")
       self.entry(raw)
-      result = subprocess.run(["cliphist", "decode"], input=raw.encode(), capture_output=True, timeout=5, check=True)
-      content = result.stdout
+      content = self.api.bounded_process(["cliphist", "decode"], content=raw.encode(), timeout=5, limit=self.LIMIT)
     if len(content) > self.LIMIT:
       raise ValueError("La entrada supera 16 MiB")
     return content
 
   def refresh(self, *, expire=False):
     with self.lock:
-      lines = self.api.optional(["cliphist", "list"]).splitlines()[:5000] if self.s.store.settings["clipboardEnabled"] else []
+      lines = self.api.optional(["cliphist", "-preview-width", "256", "list"]).splitlines()[:5000] if self.s.store.settings["clipboardEnabled"] else []
       now = int(time.time())
       changed, entries, active = False, [], set()
       retention = self.s.store.settings["clipboardRetentionHours"] * 3600
@@ -100,10 +103,9 @@ class Clipboard:
         if ident not in self.state["pins"] and len(self.state["pins"]) >= 50:
           raise ValueError("Puedes fijar hasta 50 entradas")
         _, text = self.entry(data.get("raw", ""))
-        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.api.private_directory(self.directory)
         path = self.directory / (ident + ".data")
-        path.write_bytes(content)
-        path.chmod(0o600)
+        self.api.atomic_bytes(path, content)
         self.state["pins"][ident] = {"text": text[:512], "image": "[[ binary data" in text}
         self.save()
       elif action == "clipboard-unpin" or (action == "clipboard-delete" and data.get("pin")):
@@ -121,17 +123,22 @@ class Clipboard:
       elif action == "clipboard-clear":
         self.api.command(["cliphist", "wipe"])
       elif action == "clipboard-thumbnail":
+        self.api.private_directory(self.directory)
         content = self.decode(data)
         ident = hashlib.sha256(content).hexdigest()
         cache = self.directory / "thumbnails"
-        cache.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.api.private_directory(cache)
         path = cache / (ident + ".png")
         if not path.exists():
           if not shutil.which("magick"):
             return True
-          subprocess.run(["magick", "-", "-thumbnail", "192x128>", "png:" + str(path)],
-            input=content, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True, timeout=8)
-          path.chmod(0o600)
+          coder = "png" if content.startswith(b"\x89PNG\r\n\x1a\n") else "jpeg" if content.startswith(b"\xff\xd8\xff") else "gif" if content[:6] in {b"GIF87a", b"GIF89a"} else "webp" if content[:4] == b"RIFF" and content[8:12] == b"WEBP" else "bmp" if content.startswith(b"BM") else ""
+          if not coder:
+            return True
+          argv = ["magick", "-limit", "thread", "1", "-limit", "memory", "256MiB", "-limit", "map", "256MiB", "-limit", "disk", "0",
+            "-limit", "width", "16384", "-limit", "height", "16384", "-limit", "time", "5", coder + ":-[0]", "-thumbnail", "192x128>", "png:-"]
+          thumbnail = self.api.bounded_process(argv, content=content, timeout=8, limit=1024 * 1024)
+          self.api.atomic_bytes(path, thumbnail)
           for old in sorted(cache.glob("*.png"), key=lambda item: item.stat().st_mtime, reverse=True)[16:]:
             old.unlink(missing_ok=True)
         self.s.emit("clipboard-thumbnail", {"id": data.get("id"), "url": path.as_uri()})

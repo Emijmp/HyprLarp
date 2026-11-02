@@ -4,6 +4,7 @@ import datetime as dt
 import html
 import json
 import math
+import os
 from pathlib import Path
 import re
 import shutil
@@ -59,15 +60,18 @@ class Captures:
     self.drafts = {}
     self.directory = service.store.directory / "capture-drafts"
     # Drafts from an interrupted shell are never published as finished captures.
-    if self.directory.exists():
+    if self.directory.exists() and not self.directory.is_symlink():
       for path in self.directory.glob("*"):
-        if path.is_file():
+        if re.fullmatch(r"[a-f0-9]{32}\.(png|svg)", path.name) and path.is_file():
           path.unlink(missing_ok=True)
 
   def destination(self):
     pictures = Path(self.api.optional(["xdg-user-dir", "PICTURES"], str(Path.home() / "Pictures"))) / "Screenshots"
     pictures.mkdir(parents=True, exist_ok=True)
-    return pictures / f"HyprLarp-{dt.datetime.now():%Y%m%d-%H%M%S-%f}.png"
+    path = pictures / f"HyprLarp-{dt.datetime.now():%Y%m%d-%H%M%S-%f}.png"
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    os.close(descriptor)
+    return path
 
   def copy(self, path):
     with path.open("rb") as handle:
@@ -90,7 +94,7 @@ class Captures:
     elif mode == "window":
       argv += ["-g", window_geometry(json.loads(self.api.command(["hyprctl", "-j", "activewindow"])))]
     if annotate:
-      self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+      self.api.private_directory(self.directory)
       token = uuid.uuid4().hex
       path = self.directory / (token + ".png")
     else:

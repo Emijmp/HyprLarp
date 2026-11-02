@@ -9,6 +9,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+GUI_TIMEOUT = 90
 
 
 def main() -> int:
@@ -20,16 +21,21 @@ def main() -> int:
     print("Quickshell no está instalado; falta verificar la interfaz.", file=sys.stderr)
     return 1
   with tempfile.TemporaryDirectory(prefix="hyprlarp-check-") as temporary:
+    wallpapers = Path(temporary) / "fondos # % ñ"
+    wallpapers.mkdir()
+    image = wallpapers / "imagen # % ñ.svg"
+    image.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="60"><rect width="80" height="60" fill="#454545"/></svg>')
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QT_QUICK_BACKEND": "software",
            "XDG_RUNTIME_DIR": temporary, "HYPRLARP_STATE_DIR": str(Path(temporary) / "settings"),
-           "HYPRLARP_PREVIEW": "1", "HYPRLARP_SMOKE_TEST": "1", "HYPRLARP_CAPTURE": ""}
+           "HYPRLARP_PREVIEW": "1", "HYPRLARP_SMOKE_TEST": "1", "HYPRLARP_CAPTURE": "",
+           "HYPRLARP_TEST_WALLPAPERS": str(wallpapers), "HYPRLARP_TEST_WALLPAPER_URL": image.as_uri()}
     environment.pop("WAYLAND_DISPLAY", None)
     try:
       result = subprocess.run([binary, "--path", str(ROOT), "--no-color"], env=environment,
-                  text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+                  text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=GUI_TIMEOUT)
     except subprocess.TimeoutExpired as error:
       print((error.stdout or b"").decode() if isinstance(error.stdout, bytes) else error.stdout)
-      print("La prueba de interfaz superó los 60 segundos.", file=sys.stderr)
+      print(f"La prueba de interfaz superó los {GUI_TIMEOUT} segundos.", file=sys.stderr)
       return 1
     print(result.stdout)
     errors = [line for line in result.stdout.splitlines()

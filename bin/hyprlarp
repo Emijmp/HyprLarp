@@ -11,6 +11,8 @@ import shutil
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True
+
 ROOT = Path(__file__).resolve().parents[1]
 PANELS = {
   "launcher", "control", "wifi", "bluetooth", "notifications", "clipboard", "media", "calendar",
@@ -42,7 +44,7 @@ def doctor() -> int:
         "wl-paste": "captura del portapapeles", "wl-copy": "copiar y capturas",
         "grim": "capturas de pantalla", "slurp": "selector de región",
         "hyprlock": "bloqueo", "playerctl": "teclas multimedia",
-        "nm-connection-editor": "VPN y Wi-Fi empresarial", "blueman-manager": "vinculación Bluetooth con PIN",
+        "nm-connection-editor": "VPN y Wi-Fi empresarial", "blueman-manager": "gestor Bluetooth externo opcional",
         "powerprofilesctl": "perfiles de energía", "hyprsunset": "modo nocturno", "udisksctl": "unidades USB",
         "magick": "miniaturas y editor de capturas", "pw-play": "sonido opcional de notificaciones", "hypridle": "bloqueo antes de suspender"}
   missing = False
@@ -52,22 +54,36 @@ def doctor() -> int:
     missing |= not found
   for name, description in optional.items():
     print(f"{'✓' if shutil.which(name) else '·'} {name:23} {description}")
-  print(f"{'✓' if importlib.util.find_spec('gi') else '·'} {'python-gobject':23} D-Bus nativo: energía y almacenamiento USB")
+  print(f"{'✓' if importlib.util.find_spec('gi') else '·'} {'python-gobject':23} D-Bus nativo: Wi-Fi, Bluetooth, energía y USB")
+  libnm = False
+  try:
+    import gi
+    gi.require_version("NM", "1.0")
+    from gi.repository import NM
+    libnm = hasattr(NM, "SimpleConnection")
+  except (ImportError, ValueError):
+    pass
+  print(f"{'✓' if libnm else '·'} {'libnm':23} Contraseñas Wi-Fi mediante D-Bus")
   return int(missing)
 
 
 def main() -> int:
   parser = argparse.ArgumentParser(description="HyprLarp · shell para Hyprland")
-  parser.add_argument("command", nargs="?", default="run", choices=["run", "preview", "settings", "toggle", "close", "lock", "screenshot-region", "screenshot-screen", "doctor", "install"])
+  parser.add_argument("command", nargs="?", default="run", choices=["run", "preview", "settings", "toggle", "close", "lock", "screenshot-region", "screenshot-screen", "doctor", "install", "uninstall"])
   parser.add_argument("panel", nargs="?", choices=sorted(PANELS))
   parser.add_argument("--dry-run", action="store_true", help="Mostrar los archivos de instalación")
+  parser.add_argument("--prefix", type=Path, help="Directorio de una instalación aislada")
+  parser.add_argument("--purge", action="store_true", help="Eliminar toda la carpeta de ajustes, incluidos historiales y respaldos internos")
   args = parser.parse_args()
   if args.command == "doctor":
     return doctor()
-  if args.command == "install":
-    return subprocess.call([sys.executable, str(ROOT / "tools/install.py")] + (["--dry-run"] if args.dry_run else []))
+  if args.purge and args.command != "uninstall":
+    parser.error("--purge solo se admite con uninstall")
+  if args.command in {"install", "uninstall"}:
+    options = (["--dry-run"] if args.dry_run else []) + (["--prefix", str(args.prefix)] if args.prefix else []) + (["--purge"] if args.purge else [])
+    return subprocess.call([sys.executable, str(ROOT / ("tools/" + args.command + ".py"))] + options)
   binary = runtime()
-  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(Path(__file__).resolve())}
+  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(Path(__file__).resolve()), "PYTHONDONTWRITEBYTECODE": "1"}
   sys.path.insert(0, str(ROOT))
   from backend.icons import choose_icon_theme
   icon_theme = choose_icon_theme(environment)

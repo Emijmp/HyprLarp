@@ -113,6 +113,14 @@
   "clipboardRetentionHours": 0,
   "notificationRules": {},
   "decoration": "subtle",
+  "decorationOptions": {
+    "panelCorners": true,
+    "sectionMarks": true,
+    "moduleIndicators": true,
+    "separators": true,
+    "headerIcons": true,
+    "notificationMarks": true
+  },
   "cornerRadii": {},
   "barWorkspaceDisplay": "current",
   "osdEnabled": true,

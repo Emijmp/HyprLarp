@@ -16,6 +16,9 @@ Desde Apariencia → Redondez cambia el valor general y pon barra a 0, paneles a
 
 ## Integraciones
 
+- Wi-Fi: con NetworkManager activo, conecta una red abierta, una guardada sin reescribir su contraseña y una protegida con contraseña. Prueba una contraseña incorrecta: el error debe permanecer visible en el formulario. Con dos adaptadores, comprueba que conectar/desconectar respeta el elegido. Pulsa Buscar para obtener resultados recientes.
+- Bluetooth: con BlueZ y python-gobject disponibles, busca y vincula un dispositivo nuevo; confirma el código o introduce su PIN desde el panel. En un teclado, introduce el código mostrado en el teclado remoto. Comprueba que queda vinculado y conectado, y que una conexión posterior no vuelve a vincularlo. Prueba cancelar, rechazar y cerrar el panel durante la vinculación; la solicitud debe cerrarse y detenerse la búsqueda iniciada por el shell.
+- Fondos: elige una carpeta con el explorador y otra escribiendo su ruta. Prueba nombres con espacios, `#`, `%` y Unicode; aplica una imagen, reinicia y comprueba que se conserva en todas las pantallas. Una ruta inválida debe conservar la configuración anterior. Prueba el selector desde el panel y desde configuración, incluyendo Deshacer y Restablecer solo dentro de esta última.
 - Audio: cambia salida y entrada; silencia el micrófono; inicia dos reproductores y ajusta un flujo sin alterar el otro.
 - OSD: usa las teclas de volumen, silencio, micrófono y brillo, también con sus módulos quitados. Debe aparecer en la pantalla enfocada y caducar sin tomar foco. Cambia posición y duración en General, prueba su demostración y desactívalo. No debe aparecer al iniciar el shell, sustituir un dispositivo ni durante Presentación. El brillo automático requiere los eventos backlight de udev del controlador.
 - Energía: con power-profiles-daemon y python-gobject instalados, abre Energía y cambia entre los perfiles que exponga el hardware. Comprueba el resultado con `powerprofilesctl get`; un perfil no soportado no debe ofrecerse. Verifica que los cambios hechos por otra app actualicen el módulo.
@@ -46,3 +49,10 @@ python3 tools/benchmark.py --pid 12345 --seconds 300 --output .preview/native-id
 Repite con Recursos, Audio, notificaciones activas y el blur que realmente uses. El comando solo lee el proceso y sus descendientes: no lo inicia, cierra ni modifica. Cambia 12345 por el PID real.
 
 El informe incluye CPU expresada sobre un núcleo, RSS, PSS cuando se permite leerlo y contadores DRM por motor cuando el controlador los expone. Un valor GPU nulo significa que la información no está disponible. Los porcentajes por motor suman clientes y no son la ocupación global del dispositivo. La resolución de ticks puede producir 0.00% en intervalos sin ticks contabilizados; no implica consumo absoluto cero.
+
+
+## Decoración, instalación y recursos
+
+- En Apariencia cambia cada detalle por separado, activa Mínimo y vuelve a Sutil. Comprueba que conserva las elecciones, permite Deshacer/Rehacer solo desde configuración y recupera los valores iniciales con Restablecer sección.
+- Ejecuta los scripts con un `--prefix` temporal, prueba reinstalar y desinstalar, y comprueba que se conservan los ajustes por defecto y que `--purge` los elimina. El conjunto automático también prueba rutas reservadas, manifiestos manipulados, enlaces simbólicos, rollback y lanzamiento Desktop Entry con GLib.
+- Repite la medición con `tools/benchmark.py --pid PID --seconds 300` sobre el escritorio real. Incluye copiar una imagen 4K, varias aplicaciones multimedia, muchos avisos y activar/desactivar los módulos que uses. Comprueba que cerrar el shell no deja sus procesos de captura o del filtro nocturno; los editores externos y el bloqueo son aplicaciones independientes.

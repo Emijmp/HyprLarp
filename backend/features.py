@@ -34,9 +34,7 @@ class Features:
 
   def read(self, name, fallback):
     try:
-      path = self.s.store.directory / name
-      if path.stat().st_size <= 2_000_000:
-        return json.loads(path.read_text())
+      return self.api.read_json(self.s.store.directory / name)
     except (OSError, ValueError):
       pass
     return copy.deepcopy(fallback)
@@ -115,9 +113,7 @@ class Features:
         updates = {"theme": "custom", "customPalette": palette, "accent": palette["accent"]}
       elif action == "settings-import":
         path = self.path(data.get("path"))
-        if path.stat().st_size > 1_000_000:
-          raise ValueError("El archivo supera 1 MB")
-        imported = json.loads(path.read_text())
+        imported = self.api.read_json(path, limit=1_000_000)
         if not isinstance(imported, dict) or imported.get("version") != 1:
           raise ValueError("Formato de importación desconocido")
         if imported.get("type") == "hyprlarp-theme":

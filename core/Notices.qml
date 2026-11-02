@@ -10,27 +10,84 @@ Singleton {
   property var popups: []
   property var deadlines: ({})
   property var liveTokens: ({})
+  property var liveHandlers: ({})
+  property var liveOrder: []
+  property int sequence: 0
   readonly property int unread: history.filter(n => !n.read).length
   function persist() {
-    Bridge.send("history", history);
+    if (!persistTimer.running)
+      persistTimer.start();
+  }
+  function forget(id) {
+    const previous = liveHandlers[id];
+    if (previous) {
+      try {
+        previous.notification.closed.disconnect(previous.handler);
+      } catch (error) {}
+    }
+    const handlers = Object.assign({}, liveHandlers), tokens = Object.assign({}, liveTokens), times = Object.assign({}, deadlines);
+    const token = tokens[id];
+    delete handlers[id];
+    delete tokens[id];
+    delete times[id];
+    liveHandlers = handlers;
+    liveTokens = tokens;
+    deadlines = times;
+    liveOrder = liveOrder.filter(value => value !== id);
+    popups = popups.filter(item => item.token !== token);
+  }
+  function scheduleExpiry() {
+    const pending = Object.values(deadlines).filter(value => value > 0);
+    if (!pending.length) {
+      expiryTimer.stop();
+      return;
+    }
+    expiryTimer.interval = Math.max(1, Math.min(2147483647, Math.min(...pending) - Date.now()));
+    expiryTimer.restart();
+  }
+  onDeadlinesChanged: scheduleExpiry()
+  function boundedText(value, maximum) {
+    value = value || "";
+    if (value.length <= maximum)
+      return value;
+    const last = value.charCodeAt(maximum - 1);
+    if (last >= 0xd800 && last <= 0xdbff)
+      maximum--;
+    const codes = [];
+    for (let index = 0; index < maximum; index++)
+      codes.push(value.charCodeAt(index));
+    return String.fromCharCode(...codes);
   }
   function receive(notification) {
-    notification.tracked = true;
+    const oversized = notification.body.length > 8192 || notification.summary.length > 1024 || notification.appName.length > 1024 || notification.desktopEntry.length > 1024 || notification.appIcon.length > 4096 || notification.actions.length > 32 || Array.prototype.some.call(notification.actions, action => action.text.length > 256);
+    notification.tracked = !oversized;
     const now = Date.now();
+    const previousToken = liveTokens[notification.id];
+    if (previousToken)
+      forget(notification.id);
+    if (liveOrder.length >= 64) {
+      const id = liveOrder[0], old = live(id, liveTokens[id]);
+      if (old)
+        old.dismiss();
+      forget(id);
+    }
+    sequence++;
     const item = {
       id: notification.id,
-      token: String(now) + ":" + notification.id,
-      app: notification.appName || "Aplicación",
-      appId: notification.desktopEntry || notification.appName || "Aplicación",
-      summary: notification.summary,
-      body: notification.body,
-      icon: notification.appIcon,
+      token: String(now) + ":" + notification.id + ":" + sequence,
+      app: boundedText(notification.appName || "Aplicación", 128),
+      appId: boundedText(notification.desktopEntry || notification.appName || "Aplicación", 128),
+      summary: boundedText(notification.summary, 256),
+      body: boundedText(notification.body, 2048),
+      icon: boundedText(notification.appIcon, 1024),
       time: now,
       urgency: notification.urgency,
       read: false,
       timeout: notification.expireTimeout === 0 || (notification.urgency === NotificationUrgency.Critical && notification.expireTimeout < 0) ? 0 : now + (notification.expireTimeout > 0 ? notification.expireTimeout : 6000)
     };
-    const previousToken = liveTokens[notification.id];
+    if (oversized)
+      item.timeout = now + 6000;
+    liveOrder = liveOrder.concat([notification.id]);
     liveTokens = Object.assign({}, liveTokens, {
       [notification.id]: item.token
     });
@@ -47,21 +104,24 @@ Singleton {
     if (rule.sound === true && !Bridge.preview && !Bridge.settingsOnly && !Bridge.settings.doNotDisturb && !Presentation.active && !notification.hints["suppress-sound"] && !sound.running)
       sound.running = true;
     const id = notification.id;
-    notification.closed.connect(function () {
+    const handler = function () {
       if (root.liveTokens[id] !== item.token)
         return;
-      root.popups = root.popups.filter(n => n.token !== item.token);
-      const nextDeadlines = Object.assign({}, root.deadlines);
-      delete nextDeadlines[id];
-      root.deadlines = nextDeadlines;
-      const nextTokens = Object.assign({}, root.liveTokens);
-      delete nextTokens[id];
-      root.liveTokens = nextTokens;
-    });
+      root.forget(id);
+    };
+    if (!oversized) {
+      liveHandlers = Object.assign({}, liveHandlers, {
+        [id]: {
+          notification: notification,
+          handler: handler
+        }
+      });
+      notification.closed.connect(handler);
+    }
   }
   function grouped(query, app) {
     query = query.toLowerCase().trim();
-    const groups = {}, order = [];
+    const groups = Object.create(null), order = [];
     for (const item of history) {
       if ((app && item.app !== app) || (query && !(item.app + " " + item.summary + " " + item.body).toLowerCase().includes(query)))
         continue;
@@ -106,11 +166,13 @@ Singleton {
     const notification = live(id, token);
     if (notification)
       notification.dismiss();
+    else
+      forget(id);
     popups = popups.filter(n => token !== undefined ? n.token !== token : n.id !== id);
   }
   function actions(id, token) {
     const n = live(id, token);
-    return n ? n.actions : [];
+    return n ? Array.prototype.slice.call(n.actions, 0, 8) : [];
   }
   function markRead() {
     history = history.map(n => Object.assign({}, n, {
@@ -139,16 +201,21 @@ Singleton {
     }
   }
   Timer {
-    interval: 500
-    running: Object.keys(root.deadlines).some(id => root.deadlines[id] > 0)
-    repeat: true
+    id: persistTimer
+    interval: 200
+    onTriggered: Bridge.send("history", root.history)
+  }
+  Timer {
+    id: expiryTimer
     onTriggered: {
       const expired = Object.keys(root.deadlines).filter(id => root.deadlines[id] > 0 && root.deadlines[id] <= Date.now());
       for (const id of expired) {
         const notification = root.live(Number(id));
         if (notification)
           notification.expire();
+        root.forget(Number(id));
       }
+      root.scheduleExpiry();
     }
   }
 }

@@ -39,6 +39,14 @@ Singleton {
   readonly property int radius: Math.min(8, Bridge.settings.radius || 0)
   readonly property bool decorated: (Bridge.settings.decoration || "subtle") === "subtle"
   readonly property int duration: Bridge.settings.animations ? 80 : 0
+  function detail(name) {
+    return decorated && (Bridge.settings.decorationOptions || {})[name] !== false;
+  }
+  function setDetail(name, enabled) {
+    Bridge.configure("decorationOptions", Object.assign({}, Bridge.settings.decorationOptions || {}, {
+      [name]: enabled
+    }));
+  }
   function radiusFor(kind) {
     const overrides = Bridge.settings.cornerRadii || {};
     return Math.max(0, Math.min(8, overrides[kind] ?? radius));

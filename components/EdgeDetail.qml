@@ -6,7 +6,7 @@ Item {
   property int inset: 4
   property int length: 7
   property color color: Theme.muted
-  visible: Theme.decorated
+  visible: Theme.detail("panelCorners")
   enabled: false
   Rectangle {
     x: root.inset

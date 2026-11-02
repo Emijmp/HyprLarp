@@ -26,6 +26,41 @@ ColumnLayout {
     value: Bridge.settings.decoration || "subtle"
     onEdited: value => Bridge.configure("decoration", value)
   }
+  Repeater {
+    model: [
+      {
+        key: "panelCorners",
+        title: "Remates en las esquinas de paneles"
+      },
+      {
+        key: "sectionMarks",
+        title: "Marcas junto a los títulos de sección"
+      },
+      {
+        key: "moduleIndicators",
+        title: "Indicadores de actividad en módulos"
+      },
+      {
+        key: "separators",
+        title: "Líneas divisorias"
+      },
+      {
+        key: "headerIcons",
+        title: "Iconos en cabeceras de paneles"
+      },
+      {
+        key: "notificationMarks",
+        title: "Marca lateral en notificaciones"
+      }
+    ]
+    SettingToggle {
+      required property var modelData
+      title: modelData.title
+      enabled: Theme.decorated
+      checked: (Bridge.settings.decorationOptions || {})[modelData.key] !== false
+      onEdited: checked => Theme.setDetail(modelData.key, checked)
+    }
+  }
   SectionTitle {
     text: "Tema"
   }

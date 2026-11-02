@@ -9,9 +9,14 @@ Singleton {
   property var activeScreen: null
   readonly property bool vertical: ["left", "right"].indexOf(Bridge.settings.barPosition) !== -1
   property string settingsPage: "Appearance"
+  property bool wallpaperDirectoryRequested: false
   property string sessionRequest: ""
   signal settingsRequested(string page)
   signal sessionRequested(string command)
+  function browseWallpaperDirectory() {
+    wallpaperDirectoryRequested = true;
+    openSettings("Wallpapers");
+  }
   function openSettings(page) {
     settingsPage = page || "Appearance";
     settingsOpen = true;

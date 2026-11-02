@@ -95,4 +95,8 @@ class IconResolver:
         self.cache[name] = Path(path).absolute().as_uri()
       remaining.difference_update(found)
     self.cache.update({name: "" for name in remaining})
-    return {name: self.cache[name] for name in names | absolute}
+    result = {name: self.cache[name] for name in names | absolute}
+    if len(self.cache) > 4096:
+      for name in list(self.cache)[:len(self.cache) - 4096]:
+        del self.cache[name]
+    return result

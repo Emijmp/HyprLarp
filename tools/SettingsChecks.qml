@@ -272,6 +272,22 @@ Scope {
       Bridge.undo();
     }, () => {
       root.verify(Bridge.settings.nightLightSchedule && Bridge.settings.nightLightTemperature === 3500 && Bridge.settings.osdTimeout === 2200, "General reset is undoable for night and OSD");
+      Theme.setDetail("panelCorners", false);
+      Theme.setDetail("sectionMarks", false);
+      Bridge.flush();
+    }, () => {
+      root.verify(!Theme.detail("panelCorners") && !Theme.detail("sectionMarks") && Theme.detail("headerIcons"), "decorative details are independent");
+      Bridge.undo();
+    }, () => {
+      root.verify(Theme.detail("panelCorners") && Theme.detail("sectionMarks"), "decoration changes undo as a group");
+      Bridge.redo();
+    }, () => {
+      root.verify(!Theme.detail("panelCorners") && !Theme.detail("sectionMarks"), "decoration changes redo");
+      Bridge.restoreSettings("settings-reset-section", {
+        section: "Appearance"
+      });
+    }, () => {
+      root.verify(Theme.detail("panelCorners") && Theme.detail("sectionMarks"), "Appearance reset restores decorations");
       Bridge.resetSettings();
     }]
   onRunningChanged: if (running) {
