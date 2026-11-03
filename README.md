@@ -60,6 +60,9 @@ Los datos ausentes aparecen como no disponibles. No se simulan conexiones, canci
 
 En **Fondos**, pulsa **Elegir carpeta…** o escribe una ruta absoluta o con `~/` y pulsa **Aplicar ruta** o Enter. Los mismos controles están en **Configuración → Fondos**; desde la barra, Elegir carpeta abre esa página y su explorador. Se buscan PNG, JPG, JPEG, WEBP, SVG y BMP directamente en esa carpeta, junto con los fondos incluidos; **Actualizar** vuelve a leerla. Las miniaturas se crean al desplazarte y el catálogo se limita a 200 imágenes. **Usar fondo del tema** recupera el fondo liso. Deshacer los cambios sigue siendo exclusivo de configuración.
 
+En **Configuración → Fondos → Gestor de fondos**, elige **Externo · Waypaper** para usar imágenes, GIF o vídeos con un gestor externo. HyprLarp descarga su superficie de fondo y las miniaturas internas; la barra y los paneles siguen por encima. **Abrir Waypaper** usa sus preferencias actuales; para vídeos selecciona **mpvpaper** dentro de Waypaper. Puedes restaurar el último fondo y activar su restauración al iniciar HyprLarp. Esa restauración está desactivada inicialmente. Volver a HyprLarp recupera la imagen anterior; Waypaper administra sus propios procesos. Véase la [guía de fondos externos](docs/waypaper.md).
+
+
 Capturas de la implementación: [información de batería](docs/battery.png), [OSD de prueba](docs/osd.png), [modo nocturno](docs/night-light.png) y [preferencias del OSD](docs/general-settings.png).
 
 ![Launcher centrado con iconos de aplicaciones](docs/launcher.png)
@@ -96,6 +99,12 @@ El editor permite dar nombre al tema y elegir un color con el selector RGB de ca
 En **Configuración → Apariencia → Redondez** puedes ajustar un radio general de **0–8 px** y definir valores independientes para barra, paneles y configuración, botones/casillas, campos, espacios de trabajo, avisos y ayudas emergentes. **Heredar radio general** elimina la excepción de ese tipo de elemento; 0 conserva las esquinas rectas. Estos cambios se guardan y admiten deshacer, rehacer y restablecer desde configuración.
 
 La redondez de los módulos sigue en **Módulos → Aspecto → Radio**, también de 0–8 px y con los ajustes por monitor. Se ha eliminado el pequeño trazo decorativo superior de los módulos.
+
+## Separación de ventanas
+
+En **Configuración → Apariencia → Separación de ventanas** puedes ajustar la distancia a los bordes de la pantalla, con un valor común o uno por cada borde (**0–128 px**), y la separación interior entre ventanas (**0–64 px**). Mover un control activa la personalización y aplica el cambio; los valores se guardan, sobreviven a las recargas de Hyprland y admiten deshacer, rehacer y restablecer desde configuración.
+
+Al desactivar **Personalizar desde HyprLarp**, se recarga la configuración original del compositor. Estos ajustes afectan a las ventanas en mosaico y se suman al espacio reservado por la barra. Las reglas particulares de un workspace pueden tener sus propios valores. Véase [separación de ventanas](docs/window-gaps.md).
 
 ## Perfiles y biblioteca
 
@@ -265,7 +274,7 @@ if file then
 end
 ```
 
-Este archivo aplica separación, bordes blancos de 1 px, esquinas rectas y desactiva las sombras del compositor. La app configura el shell; las ventanas del compositor se ajustan en ese archivo. El bloqueo recibe los colores del tema actual al abrirse, a partir de la plantilla `config/hyprlock.conf`.
+Este archivo aplica separación, bordes blancos de 1 px, esquinas rectas y desactiva las sombras del compositor. La separación también puede personalizarse desde Apariencia; cuando está activada, prevalece sobre los valores de este archivo. El bloqueo recibe los colores del tema actual al abrirse, a partir de la plantilla `config/hyprlock.conf`.
 
 ## Atajos y comandos
 

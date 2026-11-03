@@ -6,9 +6,17 @@ Las pruebas automáticas usan Qt offscreen y estados aislados. No prueban los so
 
 1. Desde Wayland puedes comprobar los tipos nativos sin crear barras con `quickshell --path native-types.qml`; este control requiere el backend Wayland de Qt y no funciona con offscreen. Abre HyprLarp con `./bin/hyprlarp run` después de revisar la instalación y las dependencias. Mantén una terminal disponible.
 2. En Configuración → Barra, selecciona cada salida por su nombre de Hyprland. Pon una barra horizontal y otra vertical, y modifica margen, longitud y grosor de una sola pantalla. La otra debe conservar sus ajustes.
+   Con Reservar espacio para ventanas activado, prueba las cuatro posiciones y longitudes de 25%, 75% y 100%, también centradas y al final. Las ventanas en mosaico o maximizadas deben dejar libre la barra. Al desactivar la reserva o esconder la barra debe liberarse el espacio. La geometría usa tres anclajes y márgenes complementarios para que acortar la barra no suprima su zona exclusiva.
 3. Mueve ventanas y cambia espacios desde ambas barras. El recuadro debe seguir el espacio activo de cada monitor. Comprueba espacios con nombre y números fuera del rango 1–N. Abre los diez espacios en un monitor: en Solo actual debe aparecer únicamente el activo. La rueda debe recorrer los diez. Prueba Actual y puntos: solo el activo debe llevar número. En Números compactos deben aparecer como máximo cinco celdas; prueba ambos grupos de puntos.
 4. Desconecta y reconecta una pantalla. Su barra debe desaparecer y volver con sus ajustes; los paneles deben abrirse en la pantalla enfocada. Prueba también tras cambiar la escala a 1.25, 1.5 o 2 desde tu configuración del compositor.
 5. Reduce la longitud de la barra o añade todos los módulos. Las zonas no deben superponerse; el contenido que no quepa debe poder desplazarse. Prueba arrastrar módulos y las flechas de respaldo. En Módulos → Añadir busca una función y filtra por categoría; añade calendario, brillo, perfiles y capturas. Deben abrir su función o página. Los botones de sesión deben pedir confirmación antes de ejecutarse.
+
+## Separación de ventanas
+
+1. En Apariencia → Separación de ventanas, mueve el valor exterior común con dos ventanas en mosaico. Comprueba que activa la personalización y respeta el espacio reservado de la barra.
+2. Activa los bordes independientes y asigna valores distintos a los cuatro lados. Cambia la separación interior y prueba Deshacer/Rehacer dentro de configuración, incluido un arrastre completo.
+3. Recarga Hyprland y reinicia el shell: los valores deben conservarse, también si cargas `hyprland-look.lua` después de la integración. Comprueba un workspace sin reglas propias de separación.
+4. Desactiva la personalización: deben recuperarse los valores de tu configuración original. Restablece Apariencia y deshaz ese restablecimiento. Si Hyprland no responde, comprueba el mensaje y Reintentar aplicación.
 
 ## Redondez
 
@@ -65,3 +73,11 @@ El informe incluye CPU expresada sobre un núcleo, RSS, PSS cuando se permite le
 4. En Atajos añade un comando de prueba y una acción del shell, cambia su combinación con Capturar, desactiva y elimina. Deshaz y rehace los cambios dentro de configuración y pulsa Aplicar. Un duplicado debe rechazarse.
 5. En Actuales mueve una función Lua a otra combinación y desactívala. Elimina su personalización para restaurarla. Prueba un bind dentro de un submap: sus otros binds deben seguir funcionando. Un conflicto conserva el original salvo reemplazo explícito.
 6. Prueba reinstalar y retirar una instalación temporal. La retirada solo debe desactivar su propio adaptador; los bloques de integración y los originales del usuario se gestionan en su archivo, sin reescrituras del instalador.
+
+## Waypaper y fondos animados
+
+1. En Fondos elige Externo y abre Waypaper. Con mpvpaper selecciona un vídeo local y comprueba que se ve debajo de la barra, paneles y ventanas en todas las salidas seleccionadas.
+2. Cambia de vídeo y prueba sonido/pausa desde Waypaper con socat instalado. Comprueba las opciones y la carpeta del gestor externo.
+3. Vuelve a HyprLarp y comprueba que recupera la imagen anterior. Waypaper conserva sus reproductores: detén o cambia el vídeo desde ese gestor si corresponde.
+4. Prueba Deshacer/Rehacer y Restablecer sección exclusivamente desde configuración. Restaura el último fondo con el botón y activa/desactiva Restaurar al iniciar. La app independiente no debe restaurarlo automáticamente al abrirse; el botón manual sí debe funcionar.
+5. Reinicia el shell con restauración activada y desactivada. Comprueba que no se añade un sondeo de Waypaper y que el módulo de Fondos sigue disponible.

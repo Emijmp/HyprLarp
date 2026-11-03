@@ -93,3 +93,11 @@ Los seis interruptores de decoración controlan dibujos nativos sin temporizador
 ## Binds conservados
 
 El gestor registra los handlers nativos durante la carga de la configuración y conserva los callbacks originales. La transferencia de comandos de Noctalia usa dispatchers nativos y las herramientas de audio/brillo existentes; no añade un cliente Noctalia por pulsación. Las funciones de repetición del usuario conservan su frecuencia. No hay sondeos ni procesos residentes nuevos. La consulta de binds es explícita y las listas del editor crean solo los delegados visibles. Véase [binds.md](binds.md).
+
+## Fondos externos
+
+Al seleccionar Externo, el `LazyLoader` destruye la superficie nativa de fondo y el modelo de miniaturas queda vacío. No hay consultas periódicas de Waypaper ni un reproductor adicional dentro del shell. La restauración automática es opcional y se programa una vez al iniciar el backend del shell. El reproductor externo conserva su propio ciclo de vida y consumo; no se incluye una medición nueva de vídeo/GPU en el entorno offscreen.
+
+## Separación de ventanas
+
+Los controles de separación no añaden sondeos ni procesos residentes. Las actualizaciones se agrupan en la cola existente del backend y solo se aplican si cambian los valores efectivos. Se escribe el archivo privado únicamente cuando difiere; la interacción usa una llamada acotada a `hyprctl eval`. Solo desactivar una personalización activa requiere recargar Hyprland. El archivo de datos se lee al cargar la configuración, sin añadirlo al observador de archivos Lua del compositor.

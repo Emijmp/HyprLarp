@@ -46,6 +46,7 @@ def doctor() -> int:
         "hyprlock": "bloqueo", "playerctl": "teclas multimedia",
         "nm-connection-editor": "VPN y Wi-Fi empresarial", "blueman-manager": "gestor Bluetooth externo opcional",
         "powerprofilesctl": "perfiles de energía", "hyprsunset": "modo nocturno", "udisksctl": "unidades USB",
+        "waypaper": "gestor externo de fondos", "mpvpaper": "fondos de vídeo con Waypaper", "socat": "control de mpvpaper desde Waypaper",
         "magick": "miniaturas y editor de capturas", "pw-play": "sonido opcional de notificaciones", "hypridle": "bloqueo antes de suspender"}
   missing = False
   for name, description in required.items():

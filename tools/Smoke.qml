@@ -101,6 +101,20 @@ Scope {
     repeat: true
     running: true
     onTriggered: {
+      if (Quickshell.env("HYPRLARP_GAP_CHECKS_ONLY") === "1") {
+        stop();
+        gapChecks.setSource(Qt.resolvedUrl("GapChecks.qml"), {
+          view: settings
+        });
+        return;
+      }
+      if (Quickshell.env("HYPRLARP_WAYPAPER_CHECKS_ONLY") === "1") {
+        stop();
+        waypaperChecks.setSource(Qt.resolvedUrl("WaypaperChecks.qml"), {
+          view: settings
+        });
+        return;
+      }
       if (Quickshell.env("HYPRLARP_SHORTCUT_CHECKS_ONLY") === "1") {
         stop();
         shortcutChecks.setSource(Qt.resolvedUrl("ShortcutChecks.qml"), {
@@ -348,6 +362,30 @@ Scope {
     id: shortcutChecks
     onLoaded: item.completed.connect(() => {
       if (Quickshell.env("HYPRLARP_SHORTCUT_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+      } else
+        waypaperChecks.setSource(Qt.resolvedUrl("WaypaperChecks.qml"), {
+          view: settings
+        });
+    })
+  }
+  Loader {
+    id: waypaperChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_WAYPAPER_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+      } else
+        gapChecks.setSource(Qt.resolvedUrl("GapChecks.qml"), {
+          view: settings
+        });
+    })
+  }
+  Loader {
+    id: gapChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_GAP_CHECKS_ONLY") === "1") {
         console.log("SMOKE COMPLETE");
         Qt.quit();
       } else

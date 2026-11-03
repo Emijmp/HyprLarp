@@ -345,7 +345,7 @@ class ActionSafetyTests(unittest.TestCase):
     self.temp.cleanup()
 
   def test_preview_never_executes_device_or_session_mutations(self):
-    actions = ["volume", "brightness", "wifi-connect", "wifi-power", "bluetooth-connect", "clipboard-copy", "clipboard-clear", "screenshot", "session", "apply-shortcuts", "open-tool"]
+    actions = ["volume", "brightness", "wifi-connect", "wifi-power", "bluetooth-connect", "clipboard-copy", "clipboard-clear", "screenshot", "session", "apply-shortcuts", "apply-window-gaps", "open-tool"]
     with patch("backend.service.command") as run, patch("backend.service.subprocess.Popen") as spawn:
       for action in actions:
         self.service.action({"action": action, "data": {"command": "poweroff", "value": 0.5}})

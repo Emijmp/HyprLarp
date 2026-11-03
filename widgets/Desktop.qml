@@ -18,43 +18,47 @@ Scope {
         id: layout
         configuration: BarLayout.forScreen(output.modelData)
       }
-      PanelWindow {
-        screen: output.modelData
-        anchors {
-          top: true
-          bottom: true
-          left: true
-          right: true
-        }
-        exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: WlrLayer.Background
-        WlrLayershell.namespace: "hyprlarp-wallpaper"
-        mask: Region {}
-        Wallpaper {
-          anchors.fill: parent
+      LazyLoader {
+        active: Bridge.ready && !Bridge.externalWallpaper
+        component: PanelWindow {
+          screen: output.modelData
+          anchors {
+            top: true
+            bottom: true
+            left: true
+            right: true
+          }
+          exclusionMode: ExclusionMode.Ignore
+          WlrLayershell.layer: WlrLayer.Background
+          WlrLayershell.namespace: "hyprlarp-wallpaper"
+          mask: Region {}
+          Wallpaper {
+            anchors.fill: parent
+          }
         }
       }
       PanelWindow {
         id: bar
+        readonly property var placementMargins: layout.windowMargins(screen.width, screen.height)
         visible: layout.configuration.barEnabled !== false
         screen: output.modelData
         color: "transparent"
         anchors {
-          top: layout.vertical || layout.position === "top"
-          bottom: layout.position === "bottom"
-          left: !layout.vertical || layout.position === "left"
-          right: layout.position === "right"
+          top: layout.windowAnchors.top
+          bottom: layout.windowAnchors.bottom
+          left: layout.windowAnchors.left
+          right: layout.windowAnchors.right
         }
         margins {
-          top: layout.vertical ? layout.offset(bar.screen.height) : layout.margins.top
-          bottom: layout.margins.bottom
-          left: layout.vertical ? layout.margins.left : layout.offset(bar.screen.width)
-          right: layout.margins.right
+          top: bar.placementMargins.top
+          bottom: bar.placementMargins.bottom
+          left: bar.placementMargins.left
+          right: bar.placementMargins.right
         }
         implicitWidth: layout.vertical ? layout.size : layout.length(screen.width)
         implicitHeight: layout.vertical ? layout.length(screen.height) : layout.size
-        exclusiveZone: layout.configuration.barReserveSpace ? layout.size + layout.edgeMargin : 0
-        exclusionMode: layout.configuration.barReserveSpace ? ExclusionMode.Normal : ExclusionMode.Ignore
+        exclusiveZone: layout.exclusiveZone
+        exclusionMode: layout.reserveSpace ? ExclusionMode.Normal : ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "hyprlarp-bar"
         BackgroundEffect.blurRegion: layout.configuration.barBlur ? blurRegion : null

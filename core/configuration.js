@@ -1,5 +1,6 @@
 // Search labels mirror real settings rather than indexing instantiated controls.
 var entries = [
+  ["Appearance", "Separación de ventanas", "gaps ventanas bordes pantalla margen exterior interior distancia separacion espacios"],
   ["General", "OSD", "volumen brillo microfono indicadores nivel duracion posicion"],
   ["General", "Modo nocturno", "descanso visual temperatura luz azul horario hyprsunset"],
   ["Appearance", "Redondez", "radio redondear esquinas bordes barra paneles botones campos notificaciones ayudas espacios de trabajo"],
@@ -11,7 +12,7 @@ var entries = [
   ["Bar", "Grosor", "altura tamaño padding horizontal vertical borde margen longitud alineacion blur desenfoque transparencia opacidad"],
   ["Modules", "Inicio", "modulos agregar quitar arrastrar reordenar centro final inicio bandeja tray ocultos"],
   ["Modules", "Aspecto de los módulos", "fondo radio padding borde transparencia opacidad"],
-  ["Wallpapers", "Fondos", "wallpaper imagen directorio carpeta"],
+  ["Wallpapers", "Fondos", "wallpaper imagen directorio carpeta externo waypaper animado video mpvpaper restaurar inicio"],
   ["Shortcuts", "Atajos", "binds teclado capturar combinacion conflicto aplicar agregar eliminar modificar personalizados comandos actuales noctalia"],
   ["General", "Historial del portapapeles", "clipboard activar desactivar pausar caducidad vencimiento"],
   ["General", "Notificaciones", "sonido popup avisos reglas aplicaciones historial"],

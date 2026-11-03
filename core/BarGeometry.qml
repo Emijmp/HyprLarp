@@ -19,6 +19,16 @@ QtObject {
   readonly property int fontSize: configuration.barFontSize ?? 12
   readonly property real alignment: configuration.barAlignment === "end" ? 1 : configuration.barAlignment === "center" ? 0.5 : 0
   readonly property int edgeMargin: margins[position]
+  // A positive layer-shell exclusive zone needs one edge or three anchors.
+  // Stretch along the bar using complementary margins to keep its chosen length.
+  readonly property var windowAnchors: ({
+      top: vertical || position === "top",
+      bottom: vertical || position === "bottom",
+      left: !vertical || position === "left",
+      right: !vertical || position === "right"
+    })
+  readonly property bool reserveSpace: configuration.barReserveSpace !== false && configuration.barEnabled !== false
+  readonly property int exclusiveZone: reserveSpace ? size + edgeMargin : 0
   function length(extent) {
     const available = Math.max(1, extent - (vertical ? margins.top + margins.bottom : margins.left + margins.right));
     return Math.round(available * (configuration.barLength ?? 100) / 100);
@@ -27,5 +37,13 @@ QtObject {
     const start = vertical ? margins.top : margins.left;
     const end = vertical ? margins.bottom : margins.right;
     return start + Math.round(Math.max(0, extent - start - end - length(extent)) * alignment);
+  }
+  function windowMargins(width, height) {
+    return {
+      top: vertical ? offset(height) : margins.top,
+      bottom: vertical ? Math.max(0, height - offset(height) - length(height)) : margins.bottom,
+      left: vertical ? margins.left : offset(width),
+      right: vertical ? margins.right : Math.max(0, width - offset(width) - length(width))
+    };
   }
 }

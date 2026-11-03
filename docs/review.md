@@ -2,6 +2,8 @@
 
 La revisión abarca el shell QML, los servicios Python, el protocolo entre ambos, el procesamiento del portapapeles, los procesos hijos, la configuración y el ciclo de instalación. Se conservaron los cambios de Wi-Fi, Bluetooth y fondos de la revisión anterior. No se instaló ni desinstaló nada en el escritorio del usuario: las pruebas de despliegue usan prefijos temporales.
 
+La corrección posterior de reserva de espacio de la barra sí se aplicó a los dos archivos afectados de la instalación existente, con respaldo y actualización de sus hashes en el manifiesto. No se reescribieron sus ajustes ni la configuración principal de Hyprland.
+
 ## Correcciones y comprobaciones
 
 La prioridad de esta tabla expresa el impacto dentro de HyprLarp. No asigna CVE ni representa una certificación de las dependencias.
@@ -47,7 +49,7 @@ El objetivo verificable de las optimizaciones es limitar el crecimiento con avis
 
 ## Validación
 
-Resultado final: **165 pruebas de backend correctas**, recorrido de interfaz completo (`SMOKE COMPLETE`) y vista previa ordinaria que permanece abierta. El registro de la ejecución final está en `.runtime/check-current.log`. El recorrido ampliado dispone de 90 segundos; el límite anterior de 60 segundos podía interrumpir los últimos pasos de configuración sin que hubiera un error QML.
+Resultado final: **186 pruebas de backend correctas**, recorrido de interfaz completo (`SMOKE COMPLETE`) y vista previa ordinaria que permanece abierta. El registro de la ejecución final está en `.runtime/check-current.log`. El recorrido ampliado dispone de 90 segundos; el límite anterior de 60 segundos podía interrumpir los últimos pasos de configuración sin que hubiera un error QML.
 
 `python3 tools/check.py` ejecuta las pruebas de backend y la escena completa. Incluye:
 
@@ -87,3 +89,28 @@ Se verificaron callbacks de pulsar/soltar, funciones Lua, bucles de espacios, su
 El editor QML pasa altas, cambios de comando/combinación, bajas, captura, apertura del selector, deshacer/rehacer y adopción de combinaciones de Noctalia. La revisión detectó y corrigió una restricción de variables de bucle constantes de la versión local de Lua y una advertencia de altura al destruir separadores en delegados. El pase final tiene 165 pruebas de backend correctas, `SMOKE COMPLETE` y vista previa estable.
 
 También se cargó el `hyprland.lua` real del usuario entre el preludio y la integración en `Hyprland --verify-config`: 57 declaraciones registradas y cinco binds representativos comprobados (terminal, cierre, explorador y las dos acciones del scratchpad). La verificación terminó con `config ok` y se comprobó por hash que el archivo original no cambió. No se ejecutaron sus procesos de arranque ni acciones de teclado. La prueba de pulsación y recarga con IPC sigue requiriendo la sesión real, como se detalla en [binds.md](binds.md).
+
+## Reserva de espacio de la barra
+
+La barra estaba anclada a dos bordes perpendiculares. Esa combinación hace que se ignore una zona exclusiva positiva aunque Reservar espacio para ventanas esté activado. Se usan ahora tres anclajes y márgenes complementarios en el eje largo, conservando longitud, alineación y márgenes. La reserva se retira al desactivar la opción o esconder la barra. La condición se contrasta con la [documentación de PanelWindow](https://quickshell.org/docs/v0.3.2/types/Quickshell/PanelWindow/).
+
+La prueba QML recorre 108 combinaciones de posición, longitud, alineación y dimensiones lógicas, además de la liberación de espacio. El pase completo conserva 165 pruebas de backend correctas y `SMOKE COMPLETE`. Los sockets de Hyprland no están disponibles en el entorno de comprobación; la colocación real de ventanas queda cubierta por los pasos de [validation.md](validation.md).
+
+
+## Fondos externos opcionales
+
+Se añade un proveedor externo para Waypaper u otro gestor, sin activarlo inicialmente. La superficie interna se descarga, las miniaturas se liberan y se conservan la imagen y la carpeta anteriores. Se incluyen apertura de Waypaper, restauración manual y restauración al iniciar de elección explícita. No se modifica la configuración de Waypaper ni se detienen sus reproductores al volver al fondo interno.
+
+La validación final pasa 174 pruebas de backend y el recorrido completo de interfaz, incluido `SMOKE Waypaper COMPLETE`. Cubre persistencia, deshacer/reset, liberación de imágenes, omisión del catálogo en modo externo, argumentos fijos y restauración opcional sin efectos en la vista previa. Los archivos de ejecución se actualizaron también en la copia instalada, verificando el manifiesto y guardando un respaldo. No se activó el proveedor ni se lanzó un reproductor en la sesión del usuario.
+
+Waypaper y mpvpaper están instalados. Falta socat para el control de vídeos desde Waypaper; la app lo muestra y la [guía](waypaper.md) incluye su instalación. La compilación de tipos de escritorio sin Wayland devuelve `No PanelWindow backend loaded`; las capas nativas y la reproducción requieren la sesión real y no se presentan como comprobadas aquí.
+
+## Separación de ventanas
+
+Apariencia permite ajustar la separación exterior común o por cada borde y la separación interior. La personalización está desactivada inicialmente y mover un control la activa. Los cambios se guardan, admiten deshacer/rehacer/reset desde configuración y se aplican mediante la cola existente, sin sondeo. Al desactivar la personalización se recarga la configuración original del compositor.
+
+El archivo generado contiene únicamente seis campos numéricos validados; el lector Lua no ejecuta sus datos y limita la lectura a 1 KiB. Los comandos reciben argumentos separados y los valores pasan por la validación de preferencias. El cargador persiste los ajustes y el aspecto base del rice vuelve a aplicarlos al final para no sobrescribirlos con su separación inicial.
+
+El pase final incluye 186 pruebas de backend y `SMOKE window gaps COMPLETE` dentro del recorrido completo de interfaz. Se comprueban cuatro bordes, separación interior, validación, permisos, persistencia, restauración y recuperación tras error. El verificador nativo de Hyprland confirma los valores efectivos, incluidos los de una instalación temporal que carga el aspecto base después de la integración. La colocación real de ventanas mediante el socket del compositor requiere la sesión Wayland; los pasos están en [validation.md](validation.md).
+
+La copia instalada recibió los doce archivos de ejecución afectados, el archivo de datos y la integración de sesión, con respaldo y hashes actualizados. Se verificó que no cambiaron las preferencias, los binds ni la configuración principal del usuario. Esa configuración completa también pasa `Hyprland --verify-config` después de la actualización. La captura de [los nuevos controles](window-gaps-settings.png) utiliza preferencias aisladas y renderizado offscreen.

@@ -14,3 +14,8 @@ hl.config({
     shadow = { enabled = false },
   },
 })
+
+-- Apply optional spacing after the base style so it also survives reloads.
+if rawget(_G, "HyprLarpApplyWindowGaps") then
+  HyprLarpApplyWindowGaps()
+end

@@ -22,6 +22,69 @@ Scope {
     if (!condition)
       throw new Error("Feature regression: " + message);
   }
+  BarGeometry {
+    id: barGeometry
+  }
+  function checkBarReservation() {
+    const margins = {
+      top: 8,
+      bottom: 16,
+      left: 32,
+      right: 24
+    };
+    for (const screen of [
+      {
+        width: 1920,
+        height: 1080
+      },
+      {
+        width: 1536,
+        height: 864
+      },
+      {
+        width: 1080,
+        height: 1920
+      }
+    ]) {
+      for (const position of ["top", "bottom", "left", "right"]) {
+        for (const length of [25, 75, 100]) {
+          for (const alignment of ["start", "center", "end"]) {
+            barGeometry.configuration = Object.assign({}, Bridge.settings, {
+              barPosition: position,
+              barLength: length,
+              barAlignment: alignment,
+              barMargins: margins,
+              barSize: 48,
+              barEnabled: true,
+              barReserveSpace: true
+            });
+            const anchors = barGeometry.windowAnchors;
+            root.verify(Object.values(anchors).filter(Boolean).length === 3 && anchors[position], "bar reservation has a valid edge on " + position);
+            const placement = barGeometry.windowMargins(screen.width, screen.height);
+            const extent = barGeometry.vertical ? screen.height : screen.width;
+            const leading = barGeometry.vertical ? placement.top : placement.left;
+            const trailing = barGeometry.vertical ? placement.bottom : placement.right;
+            root.verify(extent - leading - trailing === barGeometry.length(extent), "opposite anchors preserve the chosen bar length");
+            root.verify(leading === barGeometry.offset(extent), "opposite anchors preserve bar alignment");
+            root.verify(barGeometry.exclusiveZone === 48 + margins[position], "reservation includes bar thickness and its edge margin");
+            if (alignment === "start")
+              root.verify(leading === (barGeometry.vertical ? margins.top : margins.left), "leading alignment preserves the configured margin");
+            if (alignment === "end" || length === 100)
+              root.verify(trailing === (barGeometry.vertical ? margins.bottom : margins.right), "trailing alignment preserves the configured margin");
+          }
+        }
+      }
+    }
+    barGeometry.configuration = Object.assign({}, barGeometry.configuration, {
+      barReserveSpace: false
+    });
+    root.verify(!barGeometry.reserveSpace && barGeometry.exclusiveZone === 0, "turning off reservation releases the work area");
+    barGeometry.configuration = Object.assign({}, barGeometry.configuration, {
+      barReserveSpace: true,
+      barEnabled: false
+    });
+    root.verify(!barGeometry.reserveSpace && barGeometry.exclusiveZone === 0, "hiding the bar releases the work area");
+  }
   FloatingWindow {
     id: window
     title: "Feature checks"
@@ -112,6 +175,7 @@ Scope {
       root.verify(Date.now() < root.deadline, "feature checks timed out");
       switch (root.step) {
       case 0:
+        root.checkBarReservation();
         root.verify(BarEditor.targets.filter(name => name === "").length === 1, "base monitor selector appears only once");
         root.originalSpacing = Bridge.settings.barSpacing;
         root.restartBefore = Bridge.restartAttempts;

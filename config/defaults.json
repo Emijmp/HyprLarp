@@ -47,6 +47,15 @@
   "panelOpacity": 1,
   "radius": 0,
   "animations": false,
+  "windowGapsEnabled": false,
+  "windowGapsIn": 4,
+  "windowGapsOut": {
+    "top": 8,
+    "right": 8,
+    "bottom": 8,
+    "left": 8
+  },
+  "windowGapsLinked": true,
   "showAppIcons": true,
   "barModules": [
     "launcher",
@@ -62,6 +71,8 @@
   "moduleOpacities": {},
   "wallpaper": "",
   "wallpaperDirectory": "",
+  "wallpaperProvider": "internal",
+  "waypaperRestoreOnStartup": false,
   "doNotDisturb": false,
   "notificationHistoryLimit": 100,
   "clipboardEnabled": true,

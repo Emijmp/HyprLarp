@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import "../../core"
 import "../../components"
+import "." as SettingsControls
 
 ColumnLayout {
   id: root
@@ -19,6 +20,8 @@ ColumnLayout {
       danger: "Acciones de alerta"
     })
   spacing: 18
+  SettingsControls.WindowGapsSettings {}
+  Rule {}
   SettingChoice {
     title: "Detalles visuales"
     choices: ["minimal", "subtle"]

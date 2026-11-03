@@ -73,7 +73,7 @@ class Locations:
     return cls(data / "hyprlarp", config / "hyprlarp", home / ".local/bin/hyprlarp", data)
 
   def managed(self):
-    return {"launcher": self.executable, "bindings": self.config / "bindings.lua", "prelude": self.config / "bindings-prelude.lua", "session": self.config / "hyprlarp.lua",
+    return {"launcher": self.executable, "bindings": self.config / "bindings.lua", "prelude": self.config / "bindings-prelude.lua", "gaps": self.config / "window-gaps.conf", "session": self.config / "hyprlarp.lua",
       "idle": self.config / "hypridle.conf", "desktop": self.data / "applications/hyprlarp-settings.desktop",
       "icon": self.data / "icons/hicolor/scalable/apps/hyprlarp.svg"}
 

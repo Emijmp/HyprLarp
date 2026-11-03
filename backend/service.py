@@ -34,6 +34,7 @@ if __package__:
   from .wallpapers import EXTENSIONS, catalogue, local_path
   from .bluetooth import BluetoothManager
   from .wifi import WifiSecrets
+  from .gaps import WindowGaps, values as window_gaps_values
   from .shortcuts import chord_parts, chord_key, validate_custom, validate_combined, render as render_bindings
   from .safety import BoundedExecutor, JSON_LIMIT, bounded_process, private_directory, read_json, read_regular, stop_processes, idle_processes, parse_json
 else:
@@ -49,6 +50,7 @@ else:
   from wallpapers import EXTENSIONS, catalogue, local_path
   from bluetooth import BluetoothManager
   from wifi import WifiSecrets
+  from gaps import WindowGaps, values as window_gaps_values
   from shortcuts import chord_parts, chord_key, validate_custom, validate_combined, render as render_bindings
   from safety import BoundedExecutor, JSON_LIMIT, bounded_process, private_directory, read_json, read_regular, stop_processes, idle_processes, parse_json
 
@@ -99,7 +101,7 @@ def number(value: Any, low: float, high: float) -> float:
 def validate_setting(key: str, value: Any) -> Any:
   if key not in DEFAULTS or key == "version":
     raise ValueError("Ajuste desconocido")
-  if key in {"animations", "doNotDisturb", "clipboardEnabled", "clipboardPaused", "osdEnabled", "nightLightEnabled", "nightLightSchedule", "barEnabled", "barReserveSpace", "barBlur", "barShowLabels", "showAppIcons", "migrateNoctaliaBinds"}:
+  if key in {"animations", "doNotDisturb", "clipboardEnabled", "clipboardPaused", "osdEnabled", "nightLightEnabled", "nightLightSchedule", "barEnabled", "barReserveSpace", "barBlur", "barShowLabels", "showAppIcons", "migrateNoctaliaBinds", "waypaperRestoreOnStartup", "windowGapsEnabled", "windowGapsLinked"}:
     if not isinstance(value, bool):
       raise ValueError("Se esperaba verdadero o falso")
   elif key in {"barOpacity", "moduleOpacity", "moduleBackgroundOpacity", "panelOpacity"}:
@@ -126,6 +128,12 @@ def validate_setting(key: str, value: Any) -> Any:
     value = {kind: int(number(radius, 0, 8)) for kind, radius in value.items()}
   elif key in {"barMargin", "barPaddingX", "barPaddingY", "barSpacing"}:
     value = int(number(value, 0, 64))
+  elif key == "windowGapsIn":
+    value = int(number(value, 0, 64))
+  elif key == "windowGapsOut":
+    if not isinstance(value, dict) or set(value) != {"top", "right", "bottom", "left"}:
+      raise ValueError("Indica los cuatro bordes de la pantalla")
+    value = {edge: int(number(gap, 0, 128)) for edge, gap in value.items()}
   elif key in {"modulePaddingX", "modulePaddingY"}:
     value = int(number(value, 0, 32))
   elif key == "barMargins":
@@ -185,6 +193,9 @@ def validate_setting(key: str, value: Any) -> Any:
   elif key == "barPosition":
     if value not in {"top", "bottom", "left", "right"}:
       raise ValueError("Posición de barra desconocida")
+  elif key == "wallpaperProvider":
+    if not isinstance(value, str) or value not in {"internal", "external"}:
+      raise ValueError("Gestor de fondos desconocido")
   elif key == "accent":
     if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
       raise ValueError("Usa un color hexadecimal: #ffffff")
@@ -671,6 +682,7 @@ class Service:
     self.devices = Devices(self)
     self.bluetooth_manager = BluetoothManager(self)
     self.wifi_secrets = WifiSecrets()
+    self.window_gaps = WindowGaps(self, sys.modules[__name__])
     self.night = NightLight(self, sys.modules[__name__])
     self.backlight = UdevEvents("backlight", lambda: self.queue_refresh("brightness-event", lambda: self.refresh_system(brightness=True), latest=True))
 
@@ -739,6 +751,10 @@ class Service:
     self.clipboard_manager.refresh()
 
   def refresh_wallpapers(self) -> None:
+    self.emit_changed("wallpaper-tools", {name: bool(shutil.which(name)) for name in ("waypaper", "mpvpaper", "socat")})
+    if self.store.settings["wallpaperProvider"] == "external":
+      self.emit_changed("wallpapers", [])
+      return
     directory = self.store.settings["wallpaperDirectory"]
     pictures = optional(["xdg-user-dir", "PICTURES"], str(Path.home() / "Pictures")) if not directory else str(Path.home() / "Pictures")
     images, state = catalogue(directory, ROOT / "assets/wallpapers", Path(pictures) / "Wallpapers")
@@ -755,6 +771,18 @@ class Service:
       if battery:
         self.system["battery"] = battery_state()
       self.emit_changed("system", self.system)
+
+  def restore_waypaper(self):
+    if self.preview:
+      raise RuntimeError("La vista previa no restaura fondos externos")
+    if self.store.settings["wallpaperProvider"] != "external":
+      raise ValueError("Selecciona Externo en Fondos antes de restaurar Waypaper")
+    command(["waypaper", "--restore"], timeout=15)
+    self.emit("message", "Fondo restaurado mediante Waypaper")
+
+  def start_external_wallpaper(self):
+    if not self.preview and not self.settings_only and self.store.settings["wallpaperProvider"] == "external" and self.store.settings["waypaperRestoreOnStartup"]:
+      self.queue_refresh("waypaper-restore", self.restore_waypaper)
 
   def load_history(self) -> None:
     try:
@@ -832,6 +860,8 @@ class Service:
     if action != "settings" and (not self.configuration_focused or source != "config"):
       raise ValueError("Abre y enfoca la configuración para deshacer, rehacer o restablecer")
     previous_directory = self.store.settings["wallpaperDirectory"]
+    previous_provider = self.store.settings["wallpaperProvider"]
+    previous_gaps = window_gaps_values(self.store.settings)
     if action == "settings":
       self.store.update(data, record=source == "config")
     elif action == "settings-undo":
@@ -847,8 +877,10 @@ class Service:
     if self.serving:
       self.queue_refresh("night-light", self.night.sync, latest=True)
     self.wakeup.set()
-    if previous_directory != self.store.settings["wallpaperDirectory"]:
+    if previous_directory != self.store.settings["wallpaperDirectory"] or previous_provider != self.store.settings["wallpaperProvider"]:
       self.queue_refresh("wallpapers", self.refresh_wallpapers, latest=True)
+    if previous_gaps != window_gaps_values(self.store.settings):
+      self.queue_refresh("window-gaps", self.window_gaps.sync, latest=True)
     self.emit_settings()
 
   def action(self, request: dict) -> None:
@@ -993,11 +1025,17 @@ class Service:
         self.session(data.get("command"), self.store.directory)
       elif action == "open-tool":
         tools = {"network": ["nm-connection-editor"], "bluetooth": ["blueman-manager"],
-            "audio": ["pavucontrol"]}
+            "audio": ["pavucontrol"], "waypaper": ["waypaper"]}
         argv = tools.get(data.get("name"))
         if not argv or not shutil.which(argv[0]):
           raise RuntimeError("Instala el editor externo para usar esta opción")
         subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+      elif action == "waypaper-restore":
+        self.restore_waypaper()
+      elif action == "apply-window-gaps":
+        self.features.require_config(request)
+        if not self.window_gaps.sync():
+          raise RuntimeError("No se pudo aplicar la separación de ventanas; revisa el mensaje en Apariencia")
       elif action == "apply-shortcuts":
         self.features.require_config(request)
         if not self.shortcut_state()["available"]:
@@ -1072,6 +1110,7 @@ class Service:
     self.emit("modules", MODULE_DEFINITIONS)
     self.emit("palettes", PALETTES)
     self.features.startup()
+    self.emit("wallpaper-tools", {name: bool(shutil.which(name)) for name in ("waypaper", "mpvpaper", "socat")})
     self.emit_settings()
     self.load_history()
     self.emit("power", {"available": False, "profiles": [], "profile": "", "error": ""})
@@ -1082,6 +1121,8 @@ class Service:
     self.sync_watchers()
     self.sync_hardware()
     self.queue_refresh("night-light", self.night.sync)
+    self.start_external_wallpaper()
+    self.queue_refresh("window-gaps", lambda: self.window_gaps.sync(native=not self.settings_only))
     polling = threading.Thread(target=self.poll, daemon=True)
     polling.start()
     try:

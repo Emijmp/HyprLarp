@@ -84,6 +84,17 @@ Singleton {
   property var clipboard: []
   property var clipboardThumbnails: ({})
   property var wallpapers: []
+  readonly property bool externalWallpaper: settings.wallpaperProvider === "external"
+  property var wallpaperTools: ({
+      waypaper: false,
+      mpvpaper: false,
+      socat: false
+    })
+  property var windowGapsState: ({
+      enabled: false,
+      applied: false,
+      error: ""
+    })
   property var wallpaperState: ({
       directory: "",
       browseUrl: "",
@@ -386,6 +397,12 @@ Singleton {
         break;
       case "wallpapers":
         wallpapers = event.data;
+        break;
+      case "wallpaper-tools":
+        wallpaperTools = event.data;
+        break;
+      case "window-gaps":
+        windowGapsState = event.data;
         break;
       case "wallpaper-state":
         wallpaperState = event.data;
