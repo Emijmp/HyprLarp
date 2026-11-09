@@ -114,3 +114,11 @@ El archivo generado contiene únicamente seis campos numéricos validados; el le
 El pase final incluye 186 pruebas de backend y `SMOKE window gaps COMPLETE` dentro del recorrido completo de interfaz. Se comprueban cuatro bordes, separación interior, validación, permisos, persistencia, restauración y recuperación tras error. El verificador nativo de Hyprland confirma los valores efectivos, incluidos los de una instalación temporal que carga el aspecto base después de la integración. La colocación real de ventanas mediante el socket del compositor requiere la sesión Wayland; los pasos están en [validation.md](validation.md).
 
 La copia instalada recibió los doce archivos de ejecución afectados, el archivo de datos y la integración de sesión, con respaldo y hashes actualizados. Se verificó que no cambiaron las preferencias, los binds ni la configuración principal del usuario. Esa configuración completa también pasa `Hyprland --verify-config` después de la actualización. La captura de [los nuevos controles](window-gaps-settings.png) utiliza preferencias aisladas y renderizado offscreen.
+
+## Menú de sesión · 9 de noviembre de 2026
+
+Los ajustes guardados indicaban Super + X, pero el archivo aplicado aún asignaba Sesión a Super + Escape. Se corrigió únicamente esa combinación en la instalación, con respaldo y actualización del manifiesto. Los demás binds, las preferencias y el archivo principal de Hyprland conservan su contenido.
+
+El menú muestra los números 1–5 y comparte la misma selección entre ratón y teclado. Bloquear es inmediato; Suspender, Cerrar sesión, Reiniciar y Apagar conservan su confirmación, con Enter para aceptar y Escape para cancelar. Se aceptan teclas numéricas y de teclado numérico, incluidos los cambios de foco a botones; se ignoran modificadores ajenos y repeticiones automáticas.
+
+La comprobación completa pasa 187 pruebas de backend, `SMOKE session keyboard COMPLETE`, el recorrido restante de interfaz y la vista previa ordinaria. Las pulsaciones se inyectan con Qt en vista previa, donde las acciones de sesión están bloqueadas. El verificador nativo confirma la asignación de Super + X y acepta la configuración instalada. La recarga mediante el socket no está disponible en este entorno; puede enviarse desde una terminal de la sesión con `hyprctl reload`.

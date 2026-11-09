@@ -101,6 +101,11 @@ Scope {
     repeat: true
     running: true
     onTriggered: {
+      if (Quickshell.env("HYPRLARP_SESSION_CHECKS_ONLY") === "1") {
+        stop();
+        sessionChecks.setSource(Qt.resolvedUrl("SessionChecks.qml"));
+        return;
+      }
       if (Quickshell.env("HYPRLARP_GAP_CHECKS_ONLY") === "1") {
         stop();
         gapChecks.setSource(Qt.resolvedUrl("GapChecks.qml"), {
@@ -362,6 +367,16 @@ Scope {
     id: shortcutChecks
     onLoaded: item.completed.connect(() => {
       if (Quickshell.env("HYPRLARP_SHORTCUT_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+      } else
+        sessionChecks.setSource(Qt.resolvedUrl("SessionChecks.qml"));
+    })
+  }
+  Loader {
+    id: sessionChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_SESSION_CHECKS_ONLY") === "1") {
         console.log("SMOKE COMPLETE");
         Qt.quit();
       } else

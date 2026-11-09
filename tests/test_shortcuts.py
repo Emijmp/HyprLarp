@@ -125,6 +125,22 @@ APPLY()
 assert(protected:is_enabled() and collision:is_enabled() and other:is_enabled())
 ''')
 
+  def test_native_session_shortcut_replaces_only_the_noctalia_session_handler(self):
+    settings = self.empty_settings()
+    settings['shortcuts']['session'] = 'SUPER, X'
+    settings['migrateNoctaliaBinds'] = True
+    self.run_lua('''
+local original=hl.bind("SUPER+X",hl.dsp.exec_cmd("noctalia msg panel-toggle session"))
+local terminal=hl.bind("SUPER+T",function() end)
+local scratchpad=hl.bind("SUPER+SHIFT+S",function() end)
+APPLY()
+assert(not original:is_enabled())
+assert(terminal:is_enabled() and scratchpad:is_enabled())
+assert(#manager.owned==1 and #manager.conflicts==0)
+assert(manager.owned[1]:is_enabled())
+assert(manager.owned[1].key:upper()=="X" and manager.owned[1].modmask==64)
+''', settings)
+
   def test_native_inherit_keeps_both_press_and_release_callbacks(self):
     settings = self.empty_settings()
     settings["customBindings"] = validate_custom([binding(type="inherit", source="|SUPER,T", chord="SUPER CTRL, T")], DEFAULTS["shortcuts"])

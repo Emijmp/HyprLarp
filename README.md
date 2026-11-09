@@ -310,6 +310,8 @@ Este archivo aplica separación, bordes blancos de 1 px, esquinas rectas y desac
 | Brillo + / − | Brillo de pantalla |
 | Reproducir / pausa, anterior, siguiente | Reproductor multimedia |
 
+Dentro de **Sesión**, pulsa **1** para bloquear, **2** para suspender, **3** para cerrar sesión, **4** para reiniciar o **5** para apagar. Las opciones 2–5 piden confirmación: **Enter** confirma y **Escape** cancela. Otro Escape cierra el menú. Los números aparecen junto a cada opción y también funciona el teclado numérico.
+
 **Super** es la tecla Windows. Los atajos globales necesitan la inclusión de `hyprlarp.lua`; no se instalan con la vista previa. Puedes editar los de los paneles en **Configuración → Atajos** y aplicarlos con el botón de esa página. Un campo vacío desactiva ese atajo. El gestor conserva los binds existentes y omite los nuevos que entren en conflicto; no regenera tus espacios ni tus teclas multimedia. Configuración → Atajos permite añadir, eliminar y editar comandos o acciones del shell. En Actuales en Hyprland puedes cambiar la combinación de una acción Lua conservando sus callbacks, o desactivarla. Reemplazar coincidencias es una elección explícita por bind. Super + S y Super + Shift + S conservan tus acciones del espacio especial. La rueda ajusta volumen, micrófono o brillo en su módulo; el clic central silencia volumen o micrófono; el botón central sobre multimedia reproduce/pausa y el botón derecho sobre un módulo abre su gestión dentro de configuración.
 
 ```sh

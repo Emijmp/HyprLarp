@@ -61,6 +61,7 @@ Rectangle {
     z: 2
   }
   focus: true
+  Keys.forwardTo: root.panel === "session" && panelLoader.item ? [panelLoader.item] : []
   function reveal(item) {
     const flickable = scroll.contentItem;
     if (!item || !flickable || flickable.contentY === undefined)

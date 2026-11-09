@@ -73,6 +73,7 @@ El informe incluye CPU expresada sobre un núcleo, RSS, PSS cuando se permite le
 4. En Atajos añade un comando de prueba y una acción del shell, cambia su combinación con Capturar, desactiva y elimina. Deshaz y rehace los cambios dentro de configuración y pulsa Aplicar. Un duplicado debe rechazarse.
 5. En Actuales mueve una función Lua a otra combinación y desactívala. Elimina su personalización para restaurarla. Prueba un bind dentro de un submap: sus otros binds deben seguir funcionando. Un conflicto conserva el original salvo reemplazo explícito.
 6. Prueba reinstalar y retirar una instalación temporal. La retirada solo debe desactivar su propio adaptador; los bloques de integración y los originales del usuario se gestionan en su archivo, sin reescrituras del instalador.
+7. Abre Sesión con Super + X y prueba 2 Suspender, 3 Cerrar sesión, 4 Reiniciar y 5 Apagar cancelando cada confirmación con Escape. Prueba también el teclado numérico y un botón enfocado con Tab. Enter confirma; 1 bloquea directamente. Los números deben actuar solo dentro del menú. Las pruebas automáticas inyectan estas pulsaciones en vista previa, donde el backend impide ejecutar acciones de sesión.
 
 ## Waypaper y fondos animados
 

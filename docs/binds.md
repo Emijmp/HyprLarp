@@ -58,6 +58,8 @@ Si tus combinaciones de Noctalia son distintas de las iniciales, abre **Actuales
 
 ## Editar desde la app
 
+El menú de sesión usa **1 Bloquear, 2 Suspender, 3 Cerrar sesión, 4 Reiniciar y 5 Apagar**, solo mientras ese panel está abierto. Las opciones 2–5 se confirman con Enter y se cancelan con Escape; otro Escape cierra el menú. Acepta el teclado numérico y no ejecuta acciones por repetición al mantener una tecla pulsada.
+
 - **Shell:** modifica la combinación escribiéndola o usando Capturar. Eliminar la desactiva; Añadir acción del shell permite volver a asignarla.
 - **Personalizados:** añade un nombre, combinación y comando o acción del shell. Puedes editar, activar/desactivar y eliminar cada bind. Una acción puede tener varios accesos con combinaciones distintas.
 - **Actuales en Hyprland:** consulta los binds registrados por el preludio. Editar permite cambiar la combinación conservando la acción Lua y los callbacks del grupo, o sustituirla por un comando/acción del shell. Desactivar crea una personalización deshabilitada. Para recuperar el original, elimina esa personalización en Personalizados y aplica.
