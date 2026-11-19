@@ -125,6 +125,10 @@ Singleton {
     return true;
   }
   function activate(name, screen) {
+    if (name === "navigation") {
+      ShellState.toggle("navigation", screen);
+      return;
+    }
     const entry = byId[name];
     if (!entry || !commandAvailable(name))
       return;
@@ -155,7 +159,9 @@ Singleton {
       Bridge.perform("session", {
         command: "lock"
       });
-    } else if (name.startsWith("screenshot-"))
+    } else if (name === "screenshot-region-frozen")
+      ShellState.capture("region", 0, false, true);
+    else if (name.startsWith("screenshot-"))
       ShellState.capture(name.slice("screenshot-".length));
   }
 }

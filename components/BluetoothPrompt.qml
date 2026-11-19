@@ -31,7 +31,7 @@ ColumnLayout {
   }
   Label {
     text: !root.request ? "" : root.request.kind === "display" ? "Introduce este código en el dispositivo y pulsa Enter allí." : root.request.kind === "confirm" ? "Confirma que este código coincide con el del dispositivo." : root.needsInput ? "Introduce el código de vinculación del dispositivo." : "Permitir la vinculación con este dispositivo."
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
   }
@@ -39,7 +39,7 @@ ColumnLayout {
     visible: !!root.request && !!root.request.code
     text: root.request ? root.request.code : ""
     font.family: Theme.mono
-    font.pixelSize: 22
+    font.pixelSize: Theme.fontPx(22)
     Layout.fillWidth: true
   }
   Field {

@@ -4,7 +4,8 @@ QtObject {
   property var configuration: Bridge.settings
   readonly property string position: configuration.barPosition || "top"
   readonly property bool vertical: position === "left" || position === "right"
-  readonly property int size: configuration.barSize ?? 34
+  readonly property int contentMinimum: 2 * ((vertical ? paddingX : paddingY) + border + (configuration[vertical ? "modulePaddingX" : "modulePaddingY"] ?? (vertical ? 6 : 2)) + (configuration.moduleBorderWidth ?? 1)) + Math.max(fontSize + 4, iconSize, Theme.largeTargets ? 44 : 0)
+  readonly property int size: Math.max(configuration.barSize ?? 34, contentMinimum)
   readonly property var margins: configuration.barMargins || ({
       top: 8,
       right: 8,
@@ -15,8 +16,8 @@ QtObject {
   readonly property int paddingY: configuration.barPaddingY ?? 3
   readonly property int spacing: configuration.barSpacing ?? 10
   readonly property int border: configuration.barBorderWidth ?? 1
-  readonly property int iconSize: configuration.barIconSize ?? 14
-  readonly property int fontSize: configuration.barFontSize ?? 12
+  readonly property int iconSize: Theme.px(configuration.barIconSize ?? 14)
+  readonly property int fontSize: Theme.fontPx(configuration.barFontSize ?? 12)
   readonly property real alignment: configuration.barAlignment === "end" ? 1 : configuration.barAlignment === "center" ? 0.5 : 0
   readonly property int edgeMargin: margins[position]
   // A positive layer-shell exclusive zone needs one edge or three anchors.

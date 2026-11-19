@@ -2,11 +2,15 @@
 
 Un shell para Hyprland construido con **Quickshell / Qt Quick**, inspirado en la organización modular de [Noctalia](https://noctalia.dev/shell). **AMOLED Black**, negro puro y borde exterior blanco de 1 px. Cada módulo de barra tiene su propio fondo gris oscuro, borde discreto y radio de 2 px. La app incluye **Gruvbox Dark, Catppuccin Mocha, Oxocarbon, Tokyo Night, One Dark Pro** y un **tema personalizado**. No requiere instalar Noctalia.
 
+La identidad del shell usa el gato con sombrero de `assets/icono-hyprlarp.png`, acompañado del nombre **HyprLarp**; el dibujo de `assets/icono-error.png` identifica los errores. Sus versiones SVG tienen fondo transparente y se adaptan a los colores del tema. Para regenerarlas y actualizar el icono genérico de aplicaciones después de editar los originales, ejecuta `python3 tools/prepare_branding.py` (requiere ImageMagick).
+
+El icono de la aplicación instalada usa `assets/hyprlarp-desktop.svg`, con una base negra para conservar el contraste en los menús del escritorio.
+
 ![HyprLarp · vista previa real del shell](docs/preview.png)
 
 ## Probar desde el repositorio
 
-Necesitas Quickshell **0.3.2+**, Qt 6 con Qt Quick Controls y Qt SVG, Python **3.10+** y **Hyprland 0.57+** con configuración Lua para usar las integraciones del sistema.
+Necesitas Quickshell **0.3.2+**, Qt 6 con Qt Quick Controls y Qt SVG, Python **3.11+** y **Hyprland 0.57+** con configuración Lua para usar las integraciones del sistema.
 
 ```sh
 ./bin/hyprlarp doctor
@@ -14,6 +18,16 @@ Necesitas Quickshell **0.3.2+**, Qt 6 con Qt Quick Controls y Qt SVG, Python **3
 ```
 
 La vista previa abre una ventana normal. Usa datos reales disponibles, no registra un daemon de notificaciones, no inicia la captura del portapapeles y desactiva acciones de red, audio, energía, USB y sesión. Tampoco aplica el filtro nocturno. Sus ajustes se guardan por separado en `$XDG_CACHE_HOME/hyprlarp/preview` (por defecto `~/.cache/hyprlarp/preview`). Puedes explorar aplicaciones, paneles, temas y la configuración sin sustituir tu escritorio; el botón Probar OSD muestra una demostración identificada como Prueba.
+
+El launcher admite `= sqrt(81)+2`, `> configuración`, `? informe` y rutas como `~/Documentos/`. La [guía del launcher](docs/launcher.md) explica sus filtros y límites. En **Configuración → General → Estado del sistema** puedes comprobar la instalación y exportar un diagnóstico. También están disponibles `./bin/hyprlarp doctor --json` y `./bin/hyprlarp doctor --report /tmp/hyprlarp-diagnostico.json`; véase [diagnóstico](docs/diagnostics.md).
+
+**Configuración → General** incluye [accesibilidad](docs/accessibility.md): texto hasta 200%, tamaño mínimo para etiquetas, alto contraste, controles grandes, movimiento reducido y navegación con teclado/AT-SPI. `> barra` en el launcher abre espacios, módulos y bandeja por teclado. El [aislamiento de fallos y modo de recuperación](docs/recovery.md) permite reintentar un componente o recuperar el shell sin borrar los ajustes ni cerrar las aplicaciones.
+
+Los [temas por horario, estilos y diseños de panel, vistas previas y perfiles de rendimiento](docs/visual-performance.md) se configuran desde Apariencia y General. El perfil eficiente reduce sondeos y efectos; las lecturas siguen bajo demanda.
+
+En Apariencia también puedes extraer localmente colores del fondo para usarlos como acento y ajustar un panel en una vista previa temporal antes de guardar el diseño.
+
+El [panel de rendimiento](docs/performance-panel.md), en **General → Rendimiento del shell** o `> rendimiento` en el launcher, muestra CPU, memoria RSS/PSS, gráficos, arranque y carga de paneles. Permite guardar mediciones y comparar revisiones del paquete. El muestreo se detiene al cerrar el panel.
 
 Para iniciar el shell real desde este checkout:
 
@@ -34,7 +48,7 @@ Solo puede haber un servidor de notificaciones de escritorio a la vez. Si tu ses
 | Función | Implementación |
 | --- | --- |
 | Barra flotante | En todos los monitores; cuatro posiciones, ajustes por monitor y zonas inicio/centro/final; módulos con fondos individuales que se pueden añadir, quitar y reordenar arrastrando o con flechas. Espacios activos por monitor, actualizados mediante eventos de Hyprland. |
-| Launcher | Centrado en la pantalla donde lo abres, con iconos de aplicaciones `.desktop`, búsqueda con tolerancia a errores, favoritos, recientes y navegación con flechas y Enter. Usa el índice nativo de Quickshell. |
+| Launcher | Centrado en la pantalla donde lo abres; busca aplicaciones, ventanas abiertas, archivos y acciones del escritorio. Incluye calculadora, favoritos, recientes y navegación con flechas y Enter. Usa los modelos nativos de Quickshell y búsquedas de archivos acotadas, sin indexador permanente. |
 | Centro de control | Una columna de texto con Wi-Fi, Bluetooth, No molestar, volumen, brillo y acciones del sistema. Multimedia aparece solo si hay un reproductor. |
 | Wi-Fi | Redes disponibles, búsqueda, conexiones guardadas o con contraseña y adaptador elegido; formulario visible y errores detallados mediante NetworkManager. |
 | Bluetooth | Encendido, búsqueda acotada, conexión y desconexión con BlueZ. Vinculación con PIN, código de teclado o confirmación dentro del panel; recuerda y conecta el dispositivo. |
@@ -42,7 +56,7 @@ Solo puede haber un servidor de notificaciones de escritorio a la vez. Si tu ses
 | Portapapeles | Texto e imágenes con `wl-paste` / `cliphist`; fijados persistentes, miniaturas, pausa, búsqueda, caducidad opcional y limpieza sin borrar fijados. |
 | Multimedia | Reproductores MPRIS, reproducción, anterior/siguiente, selección de reproductor y posición si la aplicación lo permite. |
 | Reloj y calendario | Hora y calendario mensual con navegación; semana desde el lunes. |
-| Sesión y bloqueo | Menú con confirmación para salir, reiniciar o apagar. Pantalla de bloqueo con `hyprlock`. Suspensión con bloqueo a través de `hypridle`. |
+| Sesión y bloqueo | Menú con confirmación para salir, reiniciar o apagar. Bloqueo nativo de `hyprlock` con logo, fondo, paleta, fuente y diseño lateral o centrado de HyprLarp. Suspensión con bloqueo a través de `hypridle`. |
 | Capturas | Región, ventana activa y escritorio; temporizador; editor de recorte, flechas, texto y ocultación sólida; PNG guardado y copiado. |
 | Recursos | CPU, RAM, disco, red, temperatura disponible y tiempo activo. Muestreo cada 2 segundos mientras se ve el módulo, Recursos o el centro de control. |
 | Batería | Carga, salud/desgaste, capacidad actual y de diseño, ciclos, potencia, voltaje, temperatura, límites de carga y tiempo restante cuando el equipo los informa. Las estimaciones están identificadas. |
@@ -52,6 +66,7 @@ Solo puede haber un servidor de notificaciones de escritorio a la vez. Si tu ses
 | USB | Lista de periféricos conectados; montar, abrir, desmontar y expulsar unidades de datos con UDisks. Sin montaje automático. |
 | Fondos | Selector de carpeta, ruta editable, miniaturas y fondos del tema; imagen elegida en cada monitor. Admite espacios, Unicode y caracteres especiales en la ruta. |
 | Configuración | Buscador, campos numéricos, selector RGB, seis temas y paletas propias; perfiles, importar/exportar y reset por sección. Deshacer, rehacer y restablecer solo desde esta ventana. |
+| Pantallas y proyección | Resolución, frecuencia, escala, orientación y posición visual; solo equipo, duplicar, extender y solo pantalla externa. Prueba de 20 segundos con recuperación independiente y diseños guardados por pantallas conectadas. |
 | Audio | Selección nativa de salida/entrada, micrófono, silencio y volumen por aplicación con PipeWire. |
 | Bandeja | Módulo opcional con iconos ocultables y menús contextuales nativos. |
 | Presentación | Suprime avisos y sonidos e inhibe el reposo automático mediante Wayland mientras está activo. |
@@ -75,7 +90,7 @@ Los iconos usan el tema instalado de Qt/GTK. Si la plataforma Qt no publica las 
 
 La cabecera de configuración tiene **Deshacer**, **Rehacer** y **Restablecer…**. Estas acciones y sus atajos se habilitan únicamente mientras la ventana de configuración está abierta y enfocada. Fuera de ella, Ctrl + Z conserva el comportamiento de la aplicación activa. El historial registra exclusivamente los ajustes hechos desde configuración; los cambios realizados desde otros paneles del shell se conservan al deshacer o rehacer.
 
-El historial conserva hasta **50 cambios de configuración guardados durante la sesión del shell**, incluso al cerrar y volver a abrir su ventana. Se vacía al reiniciar el backend, el shell o cerrar la app independiente. Cada arrastre de slider se guarda como una sola operación; el cambio de tema y su acento también se deshacen juntos.
+El historial conserva hasta **50 cambios de configuración**, incluidos Deshacer y Rehacer después de reiniciar el backend, el shell o la app independiente. Si se edita `settings.json` externamente, se descarta la pila que ya no corresponde a esos ajustes; las versiones anteriores siguen disponibles para comparar y restaurar. Cada arrastre de slider se guarda como una sola operación; el cambio de tema y su acento también se deshacen juntos.
 
 | Atajo en configuración | Acción |
 | --- | --- |
@@ -88,7 +103,7 @@ El historial conserva hasta **50 cambios de configuración guardados durante la 
 
 ## Temas y colores personalizados
 
-En **Apariencia**, elige AMOLED Black, Gruvbox Dark, Catppuccin Mocha, Oxocarbon, Tokyo Night o One Dark Pro. **Personalizar este tema** crea una copia editable de la paleta activa. También puedes elegir directamente **Personalizado** para recuperar tu paleta guardada.
+En **Apariencia**, elige AMOLED Black, Gruvbox Dark, Catppuccin Mocha, Oxocarbon, Tokyo Night, One Dark Pro o Papel Claro. La vista previa muestra muestras de barra, panel, acento y texto antes de aplicar. También puedes programar una paleta diurna y otra nocturna. **Personalizar este tema** crea una copia editable de la paleta activa; **Personalizado** recupera tu paleta guardada.
 
 El editor permite dar nombre al tema y elegir un color con el selector RGB de cada muestra o escribirlo en formato `#RRGGBB` el fondo de escritorio, barra y paneles, hover, fondo de módulos, bordes, separadores, texto e iconos, texto secundario, acento y alertas. Se aplica al terminar cada campo y se guarda automáticamente. La paleta personalizada se conserva al elegir otro tema y al reiniciar; sus cambios admiten deshacer y rehacer. El bloqueo usa sus colores al abrirse.
 
@@ -110,6 +125,8 @@ Al desactivar **Personalizar desde HyprLarp**, se recarga la configuración orig
 
 En **Configuración → Perfiles**, guarda la configuración actual con un nombre o guarda solo su paleta. Puedes mantener hasta 50 perfiles y 50 temas. Aplicar un perfil, importar o aplicar una paleta admite deshacer y conserva una copia previa en `settings.backup.json`. La biblioteca se guarda en `library.json`; no se elimina con Restablecer todo.
 
+En la misma página, **Historial de configuración** conserva las últimas **30 versiones**. Pulsa **Comparar** para ver los valores actuales y guardados antes de restaurar. La restauración se puede deshacer; conserva No molestar, la pausa del portapapeles y los diseños de pantallas. El archivo privado `settings-history.json` tiene un presupuesto de 6 MiB. Véase [historial persistente](docs/settings-history.md).
+
 Los botones Importar / Exportar usan JSON local con tipo y versión explícitos. Los perfiles incluyen apariencia, barra, módulos, ajustes por monitor y preferencias; excluyen el estado temporal de No molestar y la pausa del portapapeles. Los formatos inválidos se rechazan antes de cambiar la configuración.
 
 La captura del portapapeles se pausa desde su panel. Los fijados son copias privadas de hasta 16 MiB por entrada y 50 entradas; siguen disponibles al vaciar cliphist. Las miniaturas se generan al necesitarse, con una caché de 16 imágenes. La caducidad se configura en General, está desactivada con 0 horas y cuenta desde que se observa cada entrada; no borra fijados.
@@ -117,6 +134,10 @@ La captura del portapapeles se pausa desde su panel. Los fijados son copias priv
 Los sonidos de notificaciones están desactivados por defecto. En General puedes activar sonido y decidir avisos e historial por aplicación. Presentación se controla desde el centro de control o su atajo; inhibe el reposo automático mientras está activo sin modificar los tiempos de hypridle. El bloqueo manual sigue disponible.
 
 El servicio intenta recuperarse con esperas de 1, 2 y 4 segundos, hasta tres intentos; los cambios de preferencias pendientes se conservan y se reenvían. Las acciones de red, sesión y capturas no se repiten automáticamente. El historial de deshacer del backend se vacía tras un reinicio.
+
+## Pantallas y proyectores
+
+En **Configuración → Pantallas** puedes organizar los monitores arrastrando, elegir sus modos y probar los cambios antes de guardarlos. **Super + Shift + P** abre Proyectar con las cuatro opciones de pantalla; Super + P conserva su bind anterior. La prueba se revierte en 20 segundos sin confirmación, incluso si se cierra el shell. Los diseños se recuerdan para cada combinación de pantallas. Véase [Pantallas y proyección](docs/displays.md).
 
 ## Ajustes de barra
 
@@ -150,7 +171,7 @@ Asigna los módulos a Inicio, Centro o Final; arrastra el tirador hasta un punto
 
 Las funciones adicionales empiezan fuera de la barra; las funciones siguen disponibles por teclado y desde los menús. La bandeja se carga solo al añadir su módulo; sus iconos ocultos se configuran en Módulos. Los módulos que eliges permanecen en la barra: Presentación se puede activar desde su botón, y audio, multimedia o batería indican los datos ausentes sin inventarlos.
 
-El catálogo reúne **48 módulos**. En **Módulos → En la barra** puedes quitar, mover entre zonas, reordenar y ajustar la opacidad de cada uno. **Añadir** permite buscar por nombre o función y filtrar por categoría; **Aspecto** contiene el estilo general y los iconos ocultos de la bandeja. Los mismos controles funcionan para cada monitor. Energía, modo nocturno, USB y ajustes del OSD se añaden desde ese catálogo; batería conserva su propio módulo.
+El catálogo reúne **50 módulos**. En **Módulos → En la barra** puedes quitar, mover entre zonas, reordenar y ajustar la opacidad de cada uno. **Añadir** permite buscar por nombre o función y filtrar por categoría; **Aspecto** contiene el estilo general y los iconos ocultos de la bandeja. Los mismos controles funcionan para cada monitor. Energía, modo nocturno, USB y ajustes del OSD se añaden desde ese catálogo; batería conserva su propio módulo.
 
 | Categoría | Módulos disponibles |
 | --- | --- |
@@ -182,8 +203,8 @@ Las configuraciones anteriores se migran sin reescribir el archivo hasta que gua
 `doctor` comprueba qué herramientas están instaladas. Solo necesitas las correspondientes a los módulos que uses.
 
 ```sh
-sudo pacman -S quickshell qt6-declarative qt6-svg python networkmanager bluez bluez-utils \
-  wireplumber brightnessctl wl-clipboard cliphist grim slurp hyprlock hypridle \
+sudo pacman -S quickshell qt6-declarative qt6-svg python python-pillow networkmanager bluez bluez-utils \
+  wireplumber brightnessctl wl-clipboard cliphist grim slurp hyprpicker hyprlock hypridle \
   playerctl imagemagick pipewire-audio inter-font ttf-jetbrains-mono
 ```
 
@@ -203,16 +224,22 @@ sudo pacman -S power-profiles-daemon udisks2 python-gobject libnm hyprsunset
 
 En **Configuración → General** puedes activar el OSD, cambiar posición/duración, probarlo y configurar el horario nocturno. El OSD automático se oculta durante Presentación; su prueba es explícita. Las unidades USB se consultan al abrir el panel o añadir el módulo y se actualizan con eventos. Expulsar pide confirmación y desmonta los volúmenes antes de apagar la unidad; si están ocupados, comunica el error sin forzar. Las unidades del sistema no ofrecen estas acciones.
 
+También puedes elegir formato de hora y fecha, segundos, inicio del calendario y números ISO de semana, y configurar los avisos de batería baja y crítica. **Ctrl+F** busca ajustes y lleva al control correspondiente. Los errores incluyen un botón para copiar el mensaje. Véase [Preferencias de uso diario](docs/daily.md).
+
 NetworkManager, BlueZ y PipeWire deben estar funcionando en tu sesión. El frontend no intenta habilitar servicios del sistema ni instalar paquetes.
 
 ## Instalar para tu usuario
+
+Para que la pantalla de inicio de sesión de **greetd** siga el fondo, la paleta y la fuente de HyprLarp, puedes instalar la [HyprLarp Greeter](docs/greeter.md). Se configura por separado con `python3 tools/install_greeter.py` y sincroniza automáticamente los cambios de apariencia.
 
 ```sh
 ./install.sh --dry-run
 ./install.sh
 ```
 
-Se copia el proyecto a `~/.local/share/hyprlarp`, se crea `~/.local/bin/hyprlarp` y una entrada **Configuración de HyprLarp** en el launcher. Respeta `XDG_DATA_HOME` y `XDG_CONFIG_HOME`. La instalación conserva los ajustes válidos existentes y crea respaldos de las copias y archivos que sustituye. No edita tu archivo principal de Hyprland ni activa el shell automáticamente.
+Se copia el proyecto a `~/.local/share/hyprlarp`, se crea `~/.local/bin/hyprlarp`, el servicio de usuario `hyprlarp.service` y una entrada **Configuración de HyprLarp** en el launcher. Respeta `XDG_DATA_HOME` y `XDG_CONFIG_HOME`. La instalación conserva los ajustes válidos existentes y crea respaldos de las copias y archivos que sustituye. No edita tu archivo principal de Hyprland. Una instalación nueva se inicia con `hyprlarp start`; actualizar una instancia activa la reinicia con comprobaciones y vuelve a la versión anterior si el nuevo arranque falla.
+
+El arranque de sesión generado usa `hyprlarp start`. El servicio recupera el shell tras un fallo, con dos segundos entre intentos y un máximo de tres arranques en cinco minutos. `hyprlarp stop` lo detiene expresamente; `hyprlarp run` conserva el arranque directo para desarrollo. Véanse [recuperación automática](docs/recovery.md) y [pantalla de bloqueo](docs/lockscreen.md).
 
 La copia se prepara antes de sustituir la anterior. Los archivos reemplazados se conservan con sufijo `.backup-fecha`; ante un fallo de escritura se restauran. Un manifiesto con hashes identifica los archivos gestionados. El instalador rechaza destinos superpuestos o con enlaces simbólicos y bloquea instalaciones simultáneas. No copia `.git`, `.runtime`, `.preview`, archivos arbitrarios de la raíz ni cachés Python. No instala paquetes del sistema ni requiere sudo.
 
@@ -328,6 +355,7 @@ hyprlarp toggle osd
 hyprlarp toggle wallpapers
 hyprlarp close
 hyprlarp screenshot-region
+hyprlarp screenshot-region --freeze
 hyprlarp lock
 ```
 
@@ -365,7 +393,7 @@ make check
 python3 -m unittest discover -s tests -v
 ```
 
-La comprobación completa abre los 18 paneles, las siete páginas de configuración, las cuatro posiciones de barra, valores a cero, barras cortas, los seis temas incluidos y el personalizado con el renderizador offscreen de Qt y ajustes temporales. Comprueba la navegación de los 48 módulos, las páginas de configuración y las confirmaciones de sesión; los modos visuales Mínimo y Sutil; el selector RGB, las anotaciones, los flujos de audio y la recuperación tras terminar el backend de prueba; añadir, quitar y reordenar módulos, incluyendo una barra vacía; también deshacer/rehacer cambios pendientes y guardados, revertir un reset, agrupar sliders, conservar la paleta y aplicar colores claros personalizados. Comprueba el OSD de prueba, su caducidad y desactivación, el historial de sus preferencias y del modo nocturno, y elegir una carpeta e imagen con espacios y caracteres especiales hasta comprobar su renderizado. La vinculación Bluetooth, sus confirmaciones y cancelaciones se verifican con BlueZ simulado. Las pruebas de lógica cubren errores de escritura, validación de colores, límite del historial, espacios por monitor, planificación del muestreo, telemetría de batería, horarios nocturnos, perfiles compatibles y operaciones USB con servicios simulados; las del modelo de espacios usan Node si está disponible, solo para desarrollo. Los archivos Lua se verifican con `Hyprland --verify-config` cuando está instalado. El renderizado está comprobado con Quickshell 0.3.2 y la configuración con Hyprland 0.57; los cambios físicos de monitor, las conexiones, el bloqueo/PAM, la suspensión, el OSD nativo, energía, USB, el filtro nocturno y las acciones de sesión deben verificarse en una sesión real. La vista previa no valida esos servicios.
+La comprobación completa abre los 19 paneles, las ocho páginas de configuración, las cuatro posiciones de barra, valores a cero, barras cortas, los seis temas incluidos y el personalizado con el renderizador offscreen de Qt y ajustes temporales. Comprueba la navegación de los 50 módulos, las páginas de configuración y las confirmaciones de sesión; los modos visuales Mínimo y Sutil; el selector RGB, las anotaciones, los flujos de audio y la recuperación tras terminar el backend de prueba; añadir, quitar y reordenar módulos, incluyendo una barra vacía; también deshacer/rehacer cambios pendientes y guardados, revertir un reset, agrupar sliders, conservar la paleta y aplicar colores claros personalizados. Comprueba el OSD de prueba, su caducidad y desactivación, el historial de sus preferencias y del modo nocturno, y elegir una carpeta e imagen con espacios y caracteres especiales hasta comprobar su renderizado. La vinculación Bluetooth, sus confirmaciones y cancelaciones se verifican con BlueZ simulado. Las pruebas de lógica cubren errores de escritura, validación de colores, límite del historial, espacios por monitor, planificación del muestreo, telemetría de batería, horarios nocturnos, perfiles compatibles y operaciones USB con servicios simulados; las del modelo de espacios usan Node si está disponible, solo para desarrollo. Los archivos Lua se verifican con `Hyprland --verify-config` cuando está instalado. El renderizado está comprobado con Quickshell 0.3.2 y la configuración con Hyprland 0.57; los cambios físicos de monitor, las conexiones, el bloqueo/PAM, la suspensión, el OSD nativo, energía, USB, el filtro nocturno y las acciones de sesión deben verificarse en una sesión real. La vista previa no valida esos servicios.
 
 El código usa indentación de **2 espacios** en QML, Python, JavaScript, JSON, Lua y configuración. `.editorconfig` y `.qmlformat.ini` conservan esta convención. Las reglas visuales están en [docs/design.md](docs/design.md).
 
@@ -384,3 +412,7 @@ Código, iconos y fondos incluidos bajo [MIT](LICENSE).
 La revisión de recursos, seguridad, instalación y resultados de validación está en [docs/review.md](docs/review.md). El portapapeles limita cada captura a 16 MiB antes de entregarla a cliphist y usa memoria anónima, sin archivos temporales intermedios. Las miniaturas aceptan formatos raster reconocidos y tienen límites de proceso. Los datos internos usan directorios privados y archivos de estado de modo 600.
 
 La guía de [binds actuales y personalizados](docs/binds.md) detalla el preludio, la transferencia de Noctalia y la edición sin reescribir tu configuración de Hyprland.
+
+## Desarrollo y comprobaciones automáticas
+
+El workflow `.github/workflows/check.yml` ejecuta la lógica con Python 3.11 y 3.14, y la comprobación completa de Qt/Quickshell en un contenedor Arch. No controla dispositivos físicos. Se conservan los registros, versiones y una muestra de rendimiento offscreen como artefactos durante 14 días. Véase [desarrollo y CI](docs/development.md).

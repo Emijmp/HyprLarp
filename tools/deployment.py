@@ -15,8 +15,8 @@ sys.path.insert(0, str(ROOT))
 from backend.service import atomic_bytes, read_json
 
 MARKER = ".hyprlarp-install.json"
-DIRECTORIES = {"assets", "backend", "bin", "components", "config", "core", "panels", "widgets", "tools", "tests", "docs"}
-FILES = {"HyprLarp.qml", "shell.qml", "preview.qml", "settings.qml", "native-types.qml", "README.md", "LICENSE", "Makefile", "install.sh", "uninstall.sh", ".editorconfig", ".qmlformat.ini"}
+DIRECTORIES = {"assets", "backend", "bin", "components", "config", "core", "panels", "widgets", "tools", "tests", "docs", "greeter"}
+FILES = {"HyprLarp.qml", "shell.qml", "recovery.qml", "accessibility-check.qml", "resilience-check.qml", "performance-check.qml", "visual-check.qml", "preview.qml", "settings.qml", "native-types.qml", "README.md", "LICENSE", "Makefile", "install.sh", "uninstall.sh", ".editorconfig", ".qmlformat.ini"}
 SUFFIXES = {".qml", ".py", ".js", ".json", ".lua", ".svg", ".png", ".wav", ".md", ".sh", ".conf"}
 
 
@@ -75,7 +75,8 @@ class Locations:
   def managed(self):
     return {"launcher": self.executable, "bindings": self.config / "bindings.lua", "prelude": self.config / "bindings-prelude.lua", "gaps": self.config / "window-gaps.conf", "session": self.config / "hyprlarp.lua",
       "idle": self.config / "hypridle.conf", "desktop": self.data / "applications/hyprlarp-settings.desktop",
-      "icon": self.data / "icons/hicolor/scalable/apps/hyprlarp.svg"}
+      "icon": self.data / "icons/hicolor/scalable/apps/hyprlarp.svg",
+      "service": self.config.parent / "systemd/user/hyprlarp.service"}
 
   def validate(self, installing=False):
     roots = (self.app, self.config, self.executable)
@@ -111,7 +112,7 @@ def copy_sources(destination):
         continue
       if path.is_symlink():
         raise ValueError("El paquete contiene un enlace simbólico: " + str(relative))
-      if not path.is_file() or (path.suffix not in SUFFIXES and path.name not in FILES | {"qmldir"} and relative.as_posix() != "bin/hyprlarp"):
+      if not path.is_file() or (path.suffix not in SUFFIXES and path.name not in FILES | {"qmldir"} and relative.as_posix() not in {"bin/hyprlarp", "bin/hyprlarp-greeter"}):
         continue
       target = destination / relative
       target.parent.mkdir(parents=True, exist_ok=True)
@@ -120,7 +121,7 @@ def copy_sources(destination):
   return result
 
 
-def commit(locations, stage, contents, manifest):
+def commit(locations, stage, contents, manifest, activate=None):
   """Keep backups on success; restore them if any managed write fails."""
   stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
   backups, written = {}, []
@@ -141,6 +142,8 @@ def commit(locations, stage, contents, manifest):
       if role == "launcher":
         target.chmod(0o755)
     atomic_bytes(locations.app / MARKER, manifest)
+    if activate is not None:
+      activate()
     return list(backups.values())
   except BaseException:
     for target in reversed(written):

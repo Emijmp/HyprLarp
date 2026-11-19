@@ -6,6 +6,19 @@ Slider {
   id: root
   property bool settingsControl: false
   readonly property bool trackingSettingsEdit: settingsControl && pressed
+  property int moveSerial: 0
+  onMoved: moveSerial++
+  function accessibleStep(direction) {
+    const before = moveSerial;
+    if (direction > 0)
+      increase();
+    else
+      decrease();
+    if (before === moveSerial)
+      moved();
+  }
+  Accessible.onIncreaseAction: accessibleStep(1)
+  Accessible.onDecreaseAction: accessibleStep(-1)
   onTrackingSettingsEditChanged: {
     if (trackingSettingsEdit)
       Bridge.beginSettingsEdit();
@@ -16,7 +29,8 @@ Slider {
     Bridge.endSettingsEdit()
   from: 0
   to: 1
-  implicitHeight: 20
+  implicitHeight: Theme.controlHeight(20)
+  activeFocusOnTab: true
   background: Rectangle {
     x: root.leftPadding
     y: root.topPadding + root.availableHeight / 2 - 1
@@ -37,5 +51,8 @@ Slider {
     height: 12
     radius: 0
     color: Theme.accent
+  }
+  FocusRing {
+    control: root
   }
 }

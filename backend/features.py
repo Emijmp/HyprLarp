@@ -7,6 +7,11 @@ import threading
 import time
 from urllib.parse import unquote, urlparse
 
+try:
+  from .theme_context import resolve as resolve_theme
+except ImportError:
+  from theme_context import resolve as resolve_theme
+
 
 class Features:
   def __init__(self, service, api):
@@ -110,7 +115,7 @@ class Features:
         if name not in self.library["themes"]:
           raise ValueError("El tema ya no existe")
         palette = self.api.validate_setting("customPalette", self.library["themes"][name])
-        updates = {"theme": "custom", "customPalette": palette, "accent": palette["accent"]}
+        updates = {"theme": "custom", "customPalette": palette, "accent": palette["accent"], "themeScheduleEnabled": False}
       elif action == "settings-import":
         path = self.path(data.get("path"))
         imported = self.api.read_json(path, limit=1_000_000)
@@ -118,7 +123,7 @@ class Features:
           raise ValueError("Formato de importación desconocido")
         if imported.get("type") == "hyprlarp-theme":
           palette = self.api.validate_setting("customPalette", imported.get("palette"))
-          updates = {"theme": "custom", "customPalette": palette, "accent": palette["accent"]}
+          updates = {"theme": "custom", "customPalette": palette, "accent": palette["accent"], "themeScheduleEnabled": False}
         elif imported.get("type") == "hyprlarp-profile":
           updates = self.verify_updates(imported.get("settings"))
         else:
@@ -154,7 +159,8 @@ class Features:
         if path.suffix.lower() != ".json":
           path = path.with_suffix(".json")
         if data.get("kind") == "theme":
-          palette = {**self.api.palette_for(self.s.store.settings), "accent": self.s.store.settings["accent"]}
+          _, selected, accent = resolve_theme(self.s.store.settings, self.api.PALETTES)
+          palette = {**selected, "accent": accent}
           document = {"type": "hyprlarp-theme", "version": 1, "palette": palette}
         else:
           document = {"type": "hyprlarp-profile", "version": 1, "settings": self.portable()}
@@ -172,7 +178,8 @@ class Features:
         if group == "profiles":
           next_library[group][name] = self.portable()
         else:
-          palette = {**self.api.palette_for(self.s.store.settings), "name": name, "accent": self.s.store.settings["accent"]}
+          _, selected, accent = resolve_theme(self.s.store.settings, self.api.PALETTES)
+          palette = {**selected, "name": name, "accent": accent}
           next_library[group][name] = self.api.validate_setting("customPalette", palette)
       self.api.atomic_json(self.s.store.directory / "library.json", next_library)
       self.library = next_library

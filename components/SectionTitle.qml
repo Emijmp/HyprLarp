@@ -3,7 +3,9 @@ import "../core"
 
 Label {
   id: root
-  font.pixelSize: 11
+  Accessible.role: Accessible.Heading
+  Accessible.name: text
+  font.pixelSize: Theme.fontPx(11)
   font.weight: Font.Medium
   color: Theme.muted
   leftPadding: Theme.detail("sectionMarks") ? 12 : 0

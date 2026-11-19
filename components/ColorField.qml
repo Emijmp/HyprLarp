@@ -25,13 +25,23 @@ RowLayout {
   }
   Label {
     text: root.title
-    font.pixelSize: 12
+    font.pixelSize: Theme.fontPx(12)
     Layout.fillWidth: true
+    wrapMode: Text.WordWrap
   }
   Rectangle {
     id: swatch
-    implicitWidth: 26
-    implicitHeight: 26
+    implicitWidth: Theme.controlHeight(26)
+    implicitHeight: Theme.controlHeight(26)
+    activeFocusOnTab: true
+    Keys.onReturnPressed: root.openPicker()
+    Keys.onSpacePressed: root.openPicker()
+    Accessible.role: Accessible.Button
+    Accessible.name: "Elegir color · " + root.title
+    Accessible.onPressAction: root.openPicker()
+    FocusRing {
+      control: swatch
+    }
     color: root.value
     border.width: 1
     border.color: Theme.border
@@ -44,8 +54,9 @@ RowLayout {
     }
   }
   Field {
+    Accessible.name: "Color hexadecimal · " + root.title
     text: root.value
-    Layout.preferredWidth: 120
+    Layout.preferredWidth: Theme.px(120)
     maximumLength: 7
     font.family: Theme.mono
     onEditingFinished: {

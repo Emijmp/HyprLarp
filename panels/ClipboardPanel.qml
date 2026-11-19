@@ -62,7 +62,7 @@ ColumnLayout {
     visible: !!Bridge.settings.clipboardPaused
     text: "Captura pausada · el historial sigue disponible"
     color: Theme.muted
-    font.pixelSize: 10
+    font.pixelSize: Theme.fontPx(10)
   }
   ListView {
     id: list
@@ -93,7 +93,7 @@ ColumnLayout {
           wrapMode: Text.WrapAnywhere
           maximumLineCount: 2
           Layout.fillWidth: true
-          font.pixelSize: 12
+          font.pixelSize: Theme.fontPx(12)
         }
         ActionButton {
           icon: "pin"
@@ -126,7 +126,8 @@ ColumnLayout {
           const next = Object.assign({}, Bridge.clipboardThumbnails);
           delete next[entry.modelData.id];
           Bridge.clipboardThumbnails = next;
-          entry.thumbnail();
+          // A corrupt cached file may be returned unchanged by the backend.
+          // Retry only when this row is loaded/reused again, not from Error.
         }
         asynchronous: true
         cache: false

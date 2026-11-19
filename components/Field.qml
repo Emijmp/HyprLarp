@@ -4,11 +4,15 @@ import "../core"
 
 TextField {
   id: root
-  implicitHeight: 34
+  implicitHeight: Theme.controlHeight(34)
+  Accessible.name: placeholderText || objectName || "Campo de texto"
+  Accessible.description: placeholderText || objectName || "Campo de texto"
+  Accessible.passwordEdit: echoMode === TextInput.Password
+  Accessible.onShowOnScreenAction: forceActiveFocus()
   leftPadding: 9
   rightPadding: 9
   font.family: Theme.font
-  font.pixelSize: 12
+  font.pixelSize: Theme.fontPx(12)
   color: Theme.text
   selectionColor: Theme.text
   selectedTextColor: Theme.surface
@@ -26,5 +30,8 @@ TextField {
       height: 1
       color: Theme.border
     }
+  }
+  FocusRing {
+    control: root
   }
 }

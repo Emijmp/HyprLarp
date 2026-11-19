@@ -95,7 +95,7 @@ ColumnLayout {
   Label {
     text: (Bridge.system.user || "") + " @ " + (Bridge.system.hostname || "Hyprland")
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     Layout.fillWidth: true
     Layout.bottomMargin: 8
   }

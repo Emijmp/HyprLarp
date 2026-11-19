@@ -34,7 +34,7 @@ ColumnLayout {
     currentIndex: root.application ? root.applications.indexOf(root.application) + 1 : 0
     onActivated: index => root.application = index === 0 ? "" : root.applications[index - 1]
     font.family: Theme.font
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     palette.text: Theme.text
     palette.button: Theme.surface
     palette.buttonText: Theme.text

@@ -2,7 +2,7 @@
   {
     "id": "launcher",
     "title": "Aplicaciones",
-    "icon": "grid",
+    "icon": "hyprlarp",
     "kind": "panel",
     "target": "launcher",
     "group": "Paneles",
@@ -333,6 +333,15 @@
     "description": "Abrir el selector de región y copiar la captura."
   },
   {
+    "id": "screenshot-region-frozen",
+    "title": "Capturar región estática",
+    "icon": "crop",
+    "kind": "command",
+    "target": "screenshot-region-frozen",
+    "group": "Capturas directas",
+    "description": "Congelar la pantalla mientras seleccionas la región y copiar la captura."
+  },
+  {
     "id": "screenshot-window",
     "title": "Capturar ventana",
     "icon": "window",
@@ -430,5 +439,32 @@
     "target": "General",
     "group": "Configuración",
     "description": "Activar, colocar y probar los indicadores de nivel."
+  },
+  {
+    "id": "displays",
+    "title": "Proyectar",
+    "description": "Solo equipo, duplicar, extender o solo pantalla externa",
+    "icon": "displays",
+    "group": "Paneles",
+    "kind": "panel",
+    "target": "displays"
+  },
+  {
+    "id": "performance",
+    "title": "Rendimiento de HyprLarp",
+    "description": "CPU y memoria del shell, tiempos de arranque y comparación de mediciones",
+    "icon": "chart",
+    "group": "Paneles",
+    "kind": "panel",
+    "target": "performance"
+  },
+  {
+    "id": "display-settings",
+    "title": "Pantallas",
+    "description": "Resolución, frecuencia, escala, orientación y posición de los monitores",
+    "icon": "monitor",
+    "group": "Configuración",
+    "kind": "settings",
+    "target": "Displays"
   }
 ]

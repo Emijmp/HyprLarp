@@ -25,7 +25,7 @@ ColumnLayout {
   Label {
     visible: Bridge.preview
     text: "Vista previa · las conexiones están desactivadas."
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     color: Theme.muted
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
@@ -39,19 +39,17 @@ ColumnLayout {
     Label {
       text: "Vinculando y conectando…"
       Layout.fillWidth: true
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     ActionButton {
       text: "Cancelar"
       onClicked: Bridge.perform("bluetooth-cancel")
     }
   }
-  Label {
+  StatusMessage {
     visible: !!root.connectionError || !!Bridge.bluetooth.error
     text: root.connectionError || Bridge.bluetooth.error || ""
-    font.pixelSize: 11
-    Layout.fillWidth: true
-    wrapMode: Text.WordWrap
+    error: true
   }
   RowLayout {
     SectionTitle {
@@ -84,12 +82,12 @@ ColumnLayout {
           Label {
             text: row.modelData.name
             Layout.fillWidth: true
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontPx(12)
           }
           Label {
             text: row.modelData.connected ? "Conectado" : row.modelData.paired ? "Vinculado" : "Disponible"
             color: Theme.muted
-            font.pixelSize: 10
+            font.pixelSize: Theme.fontPx(10)
           }
         }
         ActionButton {
@@ -105,6 +103,7 @@ ColumnLayout {
   }
   EmptyState {
     visible: (Bridge.bluetooth.devices || []).length === 0
+    error: !Bridge.bluetooth.available || !!Bridge.bluetooth.error
     title: Bridge.bluetooth.available ? "Sin dispositivos" : "Sin adaptador Bluetooth"
     description: "Pon el dispositivo en modo de vinculación y pulsa Buscar."
   }

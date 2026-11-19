@@ -1,0 +1,66 @@
+name: Comprobaciones
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Instalar comprobadores de JavaScript y Lua
+        run: sudo apt-get update && sudo apt-get install -y nodejs lua5.4
+      - name: Probar lógica, persistencia e instalación aislada
+        run: python tools/check.py --backend-only
+
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Instalar el entorno de escritorio de prueba
+        run: pacman -Syu --noconfirm --needed git python python-gobject libnm quickshell qt6-declarative qt6-svg qt6-wayland imagemagick nodejs lua hyprland dbus
+      - uses: actions/checkout@v6
+      - name: Preparar usuario de prueba sin privilegios
+        run: |
+          useradd --create-home --user-group hyprlarp-ci
+          mkdir -p .runtime/ci
+          chown -R hyprlarp-ci:hyprlarp-ci "$GITHUB_WORKSPACE"
+      - name: Registrar versiones
+        run: |
+          mkdir -p .runtime/ci
+          pacman -Q > .runtime/ci/versions.txt
+      - name: Comprobar backend e interfaz aislada
+        run: |
+          set -o pipefail
+          runuser -u hyprlarp-ci -- dbus-run-session -- python3 tools/check.py 2>&1 | tee .runtime/ci/check.log
+      - name: Medir reposo en el entorno de prueba
+        run: runuser -u hyprlarp-ci -- python3 tools/benchmark.py --seconds 15 --output .runtime/ci/performance.json
+      - name: Conservar registros de la comprobación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyprlarp-checks
+          path: .runtime/ci/
+          retention-days: 14
+          include-hidden-files: true

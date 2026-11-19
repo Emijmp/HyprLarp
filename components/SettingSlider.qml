@@ -21,15 +21,17 @@ ColumnLayout {
     Label {
       text: root.title
       Layout.fillWidth: true
-      font.pixelSize: 12
+      wrapMode: Text.WordWrap
+      font.pixelSize: Theme.fontPx(12)
     }
     Field {
       id: number
-      Layout.preferredWidth: 64
-      implicitHeight: 26
+      Layout.preferredWidth: Theme.px(64)
+      implicitHeight: Theme.controlHeight(26)
+      Accessible.name: root.title + " · valor numérico"
       horizontalAlignment: TextInput.AlignRight
       font.family: Theme.mono
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       text: String(Math.round(root.value * root.inputScale * 100) / 100)
       validator: DoubleValidator {
         bottom: root.from * root.inputScale
@@ -47,11 +49,13 @@ ColumnLayout {
     Label {
       text: root.displayValue
       font.family: Theme.mono
-      font.pixelSize: 10
+      font.pixelSize: Theme.fontPx(10)
       color: Theme.muted
     }
   }
   LevelSlider {
+    Accessible.name: root.title
+    Accessible.description: root.displayValue
     settingsControl: root.settingsControl
     Layout.fillWidth: true
     from: root.from

@@ -3,9 +3,11 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shlex
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -13,6 +15,7 @@ from deployment import ROOT, Locations, commit, copy_sources, desktop_word, depl
 sys.path.insert(0, str(ROOT))
 from backend.service import Store, generate_bindings, lua_string, read_regular
 from backend.gaps import render as render_window_gaps
+from backend import recovery
 
 
 def _install(locations, dry_run=False):
@@ -48,7 +51,7 @@ def _install(locations, dry_run=False):
         + 'end\n'
         + 'HyprLarpApplyWindowGaps()\n'
         + 'hl.on("hyprland.start", function()\n'
-        + '  hl.exec_cmd(' + lua_string(shlex.quote(str(executable)) + ' run') + ')\n'
+        + '  hl.exec_cmd(' + lua_string(shlex.quote(str(executable)) + ' start') + ')\n'
         + '  hl.exec_cmd(' + lua_string('hypridle -c ' + shlex.quote(str(config / 'hypridle.conf'))) + ')\n'
         + 'end)\n',
       'idle': 'general {\n  lock_cmd = ' + shlex.quote(str(executable)) + ' lock\n'
@@ -58,7 +61,8 @@ def _install(locations, dry_run=False):
       'desktop': '[Desktop Entry]\nType=Application\nName=HyprLarp Settings\n'
         + 'Name[es]=Configuración de HyprLarp\nComment=Personaliza tu escritorio\n'
         + 'Exec=env ' + desktop_word(str(executable)) + ' settings\nIcon=hyprlarp\nTerminal=false\nCategories=Settings;DesktopSettings;\n',
-      'icon': (ROOT / 'assets/hyprlarp.svg').read_text(),
+      'icon': (ROOT / 'assets/hyprlarp-desktop.svg').read_text(),
+      'service': recovery.render_unit(executable, locations.app),
     }
     contents = {role: text.encode('utf-8') for role, text in contents.items()}
     import hashlib
@@ -66,10 +70,42 @@ def _install(locations, dry_run=False):
       'managed': {role: hashlib.sha256(data).hexdigest() for role, data in contents.items() if role != 'settings'}}
     locations.config.mkdir(parents=True, exist_ok=True, mode=0o700)
     locations.config.chmod(0o700)
-    backups = commit(locations, stage, contents, json.dumps(manifest, indent=2).encode('utf-8') + b'\n')
+    # A live update is accepted only after the installed shell actually responds.
+    # Isolated prefixes never address the user's running desktop or systemd bus.
+    binary = shutil.which('quickshell') or shutil.which('qs')
+    was_running = not locations.prefix and binary and (
+      recovery.service_running(locations.app, locations.managed()['service'])
+      or bool(recovery.running_pids(locations.app))
+      or bool(recovery.running_pids(locations.app, 'recovery.qml')))
+    if was_running:
+      environment = recovery.current_session()
+      os.environ['HYPRLAND_INSTANCE_SIGNATURE'] = environment['HYPRLAND_INSTANCE_SIGNATURE']
+      recovery.stop(locations.app, binary, destination=locations.managed()['service'])
+
+    def activate():
+      try:
+        recovery.start(locations.app, executable, binary, destination=locations.managed()['service'])
+      except BaseException:
+        recovery.stop(locations.app, binary, destination=locations.managed()['service'])
+        raise
+
+    try:
+      backups = commit(locations, stage, contents, json.dumps(manifest, indent=2).encode('utf-8') + b'\n',
+        activate=activate if was_running else None)
+    except BaseException:
+      if was_running:
+        # commit has already restored every previous file before this recovery.
+        recovery.run(['systemctl', '--user', 'daemon-reload'], check=False)
+        if locations.managed()['service'].is_file():
+          recovery.start(locations.app, executable, binary, destination=locations.managed()['service'])
+        else:
+          subprocess.Popen([str(executable), 'run'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True)
+          recovery.wait_ready(locations.app, binary)
+      raise
     for backup in backups:
       print('Respaldo guardado: ' + str(backup))
-    print('\nInstalado. Ejecuta: ' + shlex.quote(str(executable)) + ' run')
+    print('\nInstalado. Ejecuta: ' + shlex.quote(str(executable)) + ' start')
     print('Antes de tus binds: dofile(' + lua_string(str(config / 'bindings-prelude.lua')) + ')')
     print('Al final de hyprland.lua: dofile(' + lua_string(str(config / 'hyprlarp.lua')) + ')')
     print('La configuración principal de Hyprland no se ha modificado.')

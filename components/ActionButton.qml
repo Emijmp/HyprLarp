@@ -12,8 +12,8 @@ Control {
   property bool danger: false
   property string hint: ""
   signal clicked
-  implicitWidth: contentItem.implicitWidth + 16
-  implicitHeight: 30
+  implicitWidth: Math.max(Theme.largeTargets ? 44 : 0, contentItem.implicitWidth + 16)
+  implicitHeight: Theme.controlHeight(30)
   leftPadding: 8
   rightPadding: 8
   hoverEnabled: true
@@ -46,6 +46,7 @@ Control {
   contentItem: RowLayout {
     spacing: 6
     Icon {
+      Accessible.ignored: true
       visible: root.icon !== ""
       name: root.icon
       color: Theme.text
@@ -53,10 +54,11 @@ Control {
       implicitHeight: 14
     }
     Label {
+      Accessible.ignored: true
       visible: root.text !== ""
       text: root.text
       color: root.danger ? Theme.danger : Theme.text
-      font.pixelSize: 12
+      font.pixelSize: Theme.fontPx(12)
       Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
     }
   }
@@ -75,7 +77,15 @@ Control {
     text: root.hint
   }
   Accessible.name: text || hint || icon
+  Accessible.description: hint
+  Accessible.focusable: enabled
+  Accessible.focused: activeFocus
+  Accessible.pressed: interaction.pressed
+  Accessible.selected: selected
   Accessible.role: Accessible.Button
   Accessible.onPressAction: if (enabled)
     clicked()
+  FocusRing {
+    control: root
+  }
 }

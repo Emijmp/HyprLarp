@@ -1,6 +1,7 @@
 """Bounded local I/O and process work; no shell interpolation."""
 
 import concurrent.futures
+from contextlib import contextmanager
 import json
 import math
 import os
@@ -29,6 +30,37 @@ def stop_processes():
           os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
           pass
+
+
+@contextmanager
+def managed_process(argv):
+  """Own a temporary helper, including shutdown and parent-death cleanup."""
+  wrapped = [sys.executable, str(Path(__file__).with_name("child.py")), str(os.getpid()), *argv]
+  with _process_lock:
+    if _closing:
+      raise RuntimeError("El servicio se está cerrando")
+    process = subprocess.Popen(wrapped, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+      stderr=subprocess.DEVNULL, start_new_session=True)
+    _processes.add(process)
+  try:
+    yield process
+  finally:
+    if process.poll() is None:
+      try:
+        os.killpg(process.pid, signal.SIGTERM)
+      except ProcessLookupError:
+        pass
+    try:
+      process.wait(timeout=0.7)
+    except subprocess.TimeoutExpired:
+      try:
+        os.killpg(process.pid, signal.SIGKILL)
+      except ProcessLookupError:
+        pass
+      process.wait(timeout=1)
+    finally:
+      with _process_lock:
+        _processes.discard(process)
 
 
 def read_regular(path, limit=JSON_LIMIT):

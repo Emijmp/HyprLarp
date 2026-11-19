@@ -21,7 +21,7 @@ ColumnLayout {
     color: Theme.muted
     wrapMode: Text.WordWrap
     Layout.fillWidth: true
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
   RowLayout {
     Field {
@@ -49,7 +49,7 @@ ColumnLayout {
       RowLayout {
         Label {
           text: entry.modelData
-          font.pixelSize: 12
+          font.pixelSize: Theme.fontPx(12)
           Layout.fillWidth: true
           elide: Text.ElideRight
         }

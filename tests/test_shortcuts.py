@@ -1,4 +1,7 @@
 import copy
+import importlib.machinery
+import importlib.util
+import io
 import json
 from pathlib import Path
 import shutil
@@ -8,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from backend.service import DEFAULTS, ROOT, Service, Store, generate_bindings, validate_setting
-from backend.shortcuts import lua_value, validate_custom
+from backend.shortcuts import invocation, lua_value, validate_custom
 from backend.layouts import section_updates
 
 
@@ -17,6 +20,39 @@ def binding(**updates):
 
 
 class ShortcutTests(unittest.TestCase):
+  def test_capture_modes_have_distinct_default_keys_and_direct_commands(self):
+    self.assertEqual(DEFAULTS["shortcuts"]["screenshot-region"], ", Print")
+    self.assertEqual(DEFAULTS["shortcuts"]["screenshot-region-frozen"], "CTRL, Print")
+    self.assertEqual(DEFAULTS["shortcuts"]["screenshot-screen"], "SHIFT, Print")
+    generated = generate_bindings(DEFAULTS, Path("/tmp/a shell/hyprlarp"))
+    self.assertIn("screenshot-region-frozen", generated)
+    self.assertNotIn("toggle screenshot-", generated)
+    self.assertEqual(invocation("screenshot-region-frozen", Path("/tmp/a shell/hyprlarp")), "'/tmp/a shell/hyprlarp' screenshot-region-frozen")
+    self.assertEqual(invocation("screenshot-window", Path("/tmp/hyprlarp")), "/tmp/hyprlarp screenshot-window")
+
+  def test_capture_cli_preserves_dynamic_ipc_and_routes_frozen_modes(self):
+    loader = importlib.machinery.SourceFileLoader("hyprlarp_capture_cli_test", str(ROOT / "bin/hyprlarp"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    cases = [(["screenshot-region"], "capture", "region"),
+      (["screenshot-screen"], "capture", "screen"),
+      (["screenshot-window"], "capture", "window"),
+      (["screenshot-region-frozen"], "captureFrozen", "region"),
+      (["screenshot-region", "--freeze"], "captureFrozen", "region"),
+      (["screenshot-window", "--freeze"], "captureFrozen", "window"),
+      (["screenshot-screen", "--freeze"], "captureFrozen", "screen")]
+    for arguments, method, mode in cases:
+      with self.subTest(arguments=arguments), patch("sys.argv", ["hyprlarp", *arguments]), \
+          patch.object(module, "runtime", return_value="qs"), patch.object(module, "ipc", return_value=True) as ipc:
+        self.assertEqual(module.main(), 0)
+        ipc.assert_called_once_with("qs", method, mode)
+    with patch("sys.argv", ["hyprlarp", "settings", "--freeze"]), patch("sys.stderr", new=io.StringIO()), \
+        patch.object(module, "runtime") as runtime, self.assertRaises(SystemExit) as error:
+      module.main()
+    self.assertEqual(error.exception.code, 2)
+    runtime.assert_not_called()
+
   def test_personal_layout_preserves_noctalia_combinations_and_scratchpad(self):
     self.assertEqual(DEFAULTS["shortcuts"]["control"], "SUPER, M")
     self.assertEqual(DEFAULTS["shortcuts"]["settings"], "SUPER, comma")

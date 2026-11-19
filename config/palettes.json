@@ -76,5 +76,18 @@
     "muted": "#9da5b4",
     "accent": "#61afef",
     "danger": "#e06c75"
+  },
+  "paper": {
+    "name": "Papel Claro",
+    "background": "#f2f0eb",
+    "surface": "#faf9f6",
+    "raised": "#e7e4dd",
+    "moduleSurface": "#efede7",
+    "border": "#30343b",
+    "separator": "#d5d2ca",
+    "text": "#24272d",
+    "muted": "#555c66",
+    "accent": "#315f9b",
+    "danger": "#a52a2a"
   }
 }

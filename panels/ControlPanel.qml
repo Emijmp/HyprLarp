@@ -32,6 +32,11 @@ ColumnLayout {
   SectionTitle {
     text: "Audio y pantalla"
   }
+  ControlRow {
+    title: "Pantallas y proyección"
+    detail: "Duplicar / extender"
+    onClicked: ShellState.open("displays")
+  }
   SettingSlider {
     id: volume
     settingsControl: false

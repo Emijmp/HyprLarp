@@ -14,7 +14,7 @@ Item {
     text: root.title
     width: root.width * 0.4
     height: root.height
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
   Label {
     id: reading
@@ -25,6 +25,6 @@ Item {
     horizontalAlignment: Text.AlignRight
     color: Theme.muted
     font.family: Theme.mono
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
 }

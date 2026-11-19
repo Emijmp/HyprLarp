@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -17,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PANELS = {
   "launcher", "control", "wifi", "bluetooth", "notifications", "clipboard", "media", "calendar",
   "session", "resources", "battery", "wallpapers", "capture", "audio", "brightness", "presentation",
-  "energy", "night-light", "usb", "osd"
+  "energy", "night-light", "usb", "osd", "displays", "performance"
 }
 
 
@@ -37,54 +36,62 @@ def ipc(binary: str, method: str, *arguments: str, quiet: bool = False) -> bool:
   return result.returncode == 0
 
 
-def doctor() -> int:
-  required = {"quickshell": "interfaz", "python3": "servicio del sistema", "hyprctl": "espacios de trabajo"}
-  optional = {"nmcli": "Wi-Fi", "bluetoothctl": "Bluetooth", "wpctl": "audio",
-        "brightnessctl": "brillo", "cliphist": "historial del portapapeles",
-        "wl-paste": "captura del portapapeles", "wl-copy": "copiar y capturas",
-        "grim": "capturas de pantalla", "slurp": "selector de región",
-        "hyprlock": "bloqueo", "playerctl": "teclas multimedia",
-        "nm-connection-editor": "VPN y Wi-Fi empresarial", "blueman-manager": "gestor Bluetooth externo opcional",
-        "powerprofilesctl": "perfiles de energía", "hyprsunset": "modo nocturno", "udisksctl": "unidades USB",
-        "waypaper": "gestor externo de fondos", "mpvpaper": "fondos de vídeo con Waypaper", "socat": "control de mpvpaper desde Waypaper",
-        "magick": "miniaturas y editor de capturas", "pw-play": "sonido opcional de notificaciones", "hypridle": "bloqueo antes de suspender"}
-  missing = False
-  for name, description in required.items():
-    found = bool(shutil.which(name) or (name == "quickshell" and shutil.which("qs")))
-    print(f"{'✓' if found else '✗'} {name:23} {description}")
-    missing |= not found
-  for name, description in optional.items():
-    print(f"{'✓' if shutil.which(name) else '·'} {name:23} {description}")
-  print(f"{'✓' if importlib.util.find_spec('gi') else '·'} {'python-gobject':23} D-Bus nativo: Wi-Fi, Bluetooth, energía y USB")
-  libnm = False
-  try:
-    import gi
-    gi.require_version("NM", "1.0")
-    from gi.repository import NM
-    libnm = hasattr(NM, "SimpleConnection")
-  except (ImportError, ValueError):
-    pass
-  print(f"{'✓' if libnm else '·'} {'libnm':23} Contraseñas Wi-Fi mediante D-Bus")
-  return int(missing)
+def doctor(*, json_output=False, report_path=None, include_logs=True) -> int:
+  sys.path.insert(0, str(ROOT))
+  from backend import diagnostics
+  import json
+  report = diagnostics.collect(ROOT, include_logs=include_logs)
+  if report_path:
+    diagnostics.export(report, report_path)
+  print(json.dumps(report, ensure_ascii=False, indent=2) if json_output else diagnostics.render(report))
+  if report_path and not json_output:
+    print("\nInforme guardado: " + str(report_path))
+  return int(not report["ok"])
 
 
 def main() -> int:
   parser = argparse.ArgumentParser(description="HyprLarp · shell para Hyprland")
-  parser.add_argument("command", nargs="?", default="run", choices=["run", "preview", "settings", "toggle", "close", "lock", "screenshot-region", "screenshot-screen", "doctor", "install", "uninstall"])
+  parser.add_argument("command", nargs="?", default="run", choices=["run", "start", "stop", "ready", "session-check", "recover", "retry", "preview", "settings", "toggle", "close", "lock", "screenshot-region", "screenshot-region-frozen", "screenshot-screen", "screenshot-window", "doctor", "install", "uninstall"])
   parser.add_argument("panel", nargs="?", choices=sorted(PANELS))
   parser.add_argument("--dry-run", action="store_true", help="Mostrar los archivos de instalación")
   parser.add_argument("--prefix", type=Path, help="Directorio de una instalación aislada")
   parser.add_argument("--purge", action="store_true", help="Eliminar toda la carpeta de ajustes, incluidos historiales y respaldos internos")
+  parser.add_argument("--json", action="store_true", help="Diagnóstico en formato JSON")
+  parser.add_argument("--report", type=Path, help="Guardar el diagnóstico en un archivo JSON privado")
+  parser.add_argument("--no-logs", action="store_true", help="Omitir registros recientes del diagnóstico")
+  parser.add_argument("--freeze", action="store_true", help="Congelar la pantalla durante la selección de la captura")
   args = parser.parse_args()
+  if args.freeze and not args.command.startswith("screenshot-"):
+    parser.error("--freeze solo se admite con los comandos screenshot-*")
   if args.command == "doctor":
-    return doctor()
+    return doctor(json_output=args.json, report_path=args.report, include_logs=not args.no_logs)
   if args.purge and args.command != "uninstall":
     parser.error("--purge solo se admite con uninstall")
   if args.command in {"install", "uninstall"}:
     options = (["--dry-run"] if args.dry_run else []) + (["--prefix", str(args.prefix)] if args.prefix else []) + (["--purge"] if args.purge else [])
     return subprocess.call([sys.executable, str(ROOT / ("tools/" + args.command + ".py"))] + options)
+  sys.path.insert(0, str(ROOT))
+  if args.command == "session-check":
+    from backend.recovery import session_alive
+    return 0 if session_alive() else 1
+  if args.command in {"recover", "retry"}:
+    from backend.supervisor import request
+    request(ROOT, 'recovery' if args.command == 'recover' else 'normal')
+    return 0
   binary = runtime()
-  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(Path(__file__).resolve()), "PYTHONDONTWRITEBYTECODE": "1"}
+  if args.command in {"start", "stop", "ready"}:
+    from backend import recovery
+    if args.command == "start":
+      # The installed user launcher is the stable entry point used by the unit.
+      config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+      executable = Path(os.environ.get("HYPRLARP_EXECUTABLE", Path.home() / ".local/bin/hyprlarp"))
+      recovery.start(ROOT, executable, binary, destination=recovery.unit_path(config))
+    elif args.command == "stop":
+      recovery.stop(ROOT, binary)
+    else:
+      recovery.wait_ready(ROOT, binary, timeout=50)
+    return 0
+  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(Path(__file__).resolve()), "PYTHONDONTWRITEBYTECODE": "1", "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1"}
   sys.path.insert(0, str(ROOT))
   from backend.icons import choose_icon_theme
   icon_theme = choose_icon_theme(environment)
@@ -97,6 +104,9 @@ def main() -> int:
       environment["HYPRLARP_PREVIEW"] = "1"
       cache = Path(environment.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
       environment.setdefault("HYPRLARP_STATE_DIR", str(cache / "hyprlarp/preview"))
+    if args.command == "run":
+      from backend.supervisor import supervise
+      return supervise(ROOT, binary, environment)
     os.execvpe(binary, [binary, "--path", str(entrypoint), "--no-duplicate"], environment)
   if args.command == "settings":
     if ipc(binary, "settings", quiet=True):
@@ -114,14 +124,16 @@ def main() -> int:
     from backend.service import Service
     Service.session("lock")
     return 0
-  if args.command in {"screenshot-region", "screenshot-screen"}:
-    return 0 if ipc(binary, "capture", args.command.removeprefix("screenshot-")) else 1
+  if args.command.startswith("screenshot-"):
+    frozen = args.freeze or args.command == "screenshot-region-frozen"
+    mode = args.command.removeprefix("screenshot-").removesuffix("-frozen")
+    return 0 if ipc(binary, "captureFrozen" if frozen else "capture", mode) else 1
   return 0
 
 
 if __name__ == "__main__":
   try:
     sys.exit(main())
-  except (OSError, RuntimeError) as error:
+  except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
     print(f"HyprLarp: {error}", file=sys.stderr)
     sys.exit(1)

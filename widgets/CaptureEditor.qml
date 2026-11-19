@@ -10,6 +10,71 @@ Rectangle {
   property var operations: []
   property var crop: null
   property var current: null
+  property real cursorX: draft.width / 2
+  property real cursorY: draft.height / 2
+  function finishCurrent() {
+    if (!current)
+      return;
+    const operation = current;
+    if (operation.kind === "arrow" ? Math.hypot(operation.x2 - operation.x, operation.y2 - operation.y) >= 1 : Math.abs(operation.x2 - operation.x) >= 1 && Math.abs(operation.y2 - operation.y) >= 1) {
+      if (operation.kind === "crop")
+        crop = {
+          x: Math.min(operation.x, operation.x2),
+          y: Math.min(operation.y, operation.y2),
+          width: Math.abs(operation.x2 - operation.x),
+          height: Math.abs(operation.y2 - operation.y)
+        };
+      else if (operations.length < 100)
+        operations = operations.concat([operation]);
+    }
+    current = null;
+    canvas.requestPaint();
+  }
+  function keyboardAction(key, modifiers) {
+    const amount = modifiers & Qt.ShiftModifier ? 10 : 1;
+    if (key === Qt.Key_Left)
+      cursorX = Math.max(0, cursorX - amount);
+    else if (key === Qt.Key_Right)
+      cursorX = Math.min(draft.width, cursorX + amount);
+    else if (key === Qt.Key_Up)
+      cursorY = Math.max(0, cursorY - amount);
+    else if (key === Qt.Key_Down)
+      cursorY = Math.min(draft.height, cursorY + amount);
+    else if (key === Qt.Key_Escape)
+      current = null;
+    else if ([Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter].includes(key)) {
+      if (tool === "text" && annotationText.text.trim() && operations.length < 100)
+        operations = operations.concat([
+          {
+            kind: "text",
+            x: cursorX,
+            y: cursorY,
+            x2: cursorX,
+            y2: cursorY,
+            text: annotationText.text
+          }
+        ]);
+      else if (current) {
+        finishCurrent();
+        return true;
+      } else
+        current = {
+          kind: tool,
+          x: cursorX,
+          y: cursorY,
+          x2: cursorX,
+          y2: cursorY
+        };
+    } else
+      return false;
+    if (current)
+      current = Object.assign({}, current, {
+        x2: cursorX,
+        y2: cursorY
+      });
+    canvas.requestPaint();
+    return true;
+  }
   onOperationsChanged: canvas.requestPaint()
   onCropChanged: canvas.requestPaint()
   color: Theme.surface
@@ -90,7 +155,7 @@ Rectangle {
     RowLayout {
       Label {
         text: "Editar captura"
-        font.pixelSize: 15
+        font.pixelSize: Theme.fontPx(15)
         Layout.fillWidth: true
       }
       ActionButton {
@@ -148,14 +213,24 @@ Rectangle {
       Layout.fillWidth: true
     }
     Label {
-      text: root.tool === "text" ? "Escribe el texto y haz clic donde quieras colocarlo." : "Arrastra sobre la imagen. Las áreas ocultas se rellenan con negro sólido al guardar."
+      text: "Ratón: arrastra o pulsa para anotar. Teclado: enfoca la imagen con Tab, mueve el cursor con flechas (Mayús: 10 px), Espacio fija el inicio y Enter aplica. Escape cancela el trazo."
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     Rectangle {
       id: stage
+      activeFocusOnTab: true
+      Keys.onPressed: event => event.accepted = root.keyboardAction(event.key, event.modifiers)
+      Accessible.role: Accessible.Graphic
+      Accessible.name: "Imagen de captura · " + root.draft.width + " por " + root.draft.height + " píxeles"
+      Accessible.description: "Cursor " + Math.round(root.cursorX) + ", " + Math.round(root.cursorY) + ". Flechas para mover; Espacio para iniciar; Enter para aplicar."
+      Accessible.focusable: true
+      Accessible.onPressAction: root.keyboardAction(Qt.Key_Space, 0)
+      FocusRing {
+        control: stage
+      }
       Layout.fillWidth: true
       Layout.fillHeight: true
       color: Theme.background
@@ -196,6 +271,11 @@ Rectangle {
                 y2: root.crop.y + root.crop.height
               }, true);
             root.draw(context, root.current, true);
+            if (stage.activeFocus) {
+              context.strokeStyle = "#ffffff";
+              context.lineWidth = 2 / stage.scaleFactor;
+              context.strokeRect(root.cursorX - 4 / stage.scaleFactor, root.cursorY - 4 / stage.scaleFactor, 8 / stage.scaleFactor, 8 / stage.scaleFactor);
+            }
             context.restore();
           }
         }
@@ -239,20 +319,7 @@ Rectangle {
           onReleased: {
             if (!root.current)
               return;
-            const operation = root.current;
-            if (operation.kind === "arrow" ? Math.hypot(operation.x2 - operation.x, operation.y2 - operation.y) >= 1 : Math.abs(operation.x2 - operation.x) >= 1 && Math.abs(operation.y2 - operation.y) >= 1) {
-              if (operation.kind === "crop")
-                root.crop = {
-                  x: Math.min(operation.x, operation.x2),
-                  y: Math.min(operation.y, operation.y2),
-                  width: Math.abs(operation.x2 - operation.x),
-                  height: Math.abs(operation.y2 - operation.y)
-                };
-              else if (root.operations.length < 100)
-                root.operations = root.operations.concat([operation]);
-            }
-            root.current = null;
-            canvas.requestPaint();
+            root.finishCurrent();
           }
           onCanceled: {
             root.current = null;
@@ -265,7 +332,7 @@ Rectangle {
       text: root.draft.width + " × " + root.draft.height + (root.crop ? " · recorte " + Math.round(root.crop.width) + " × " + Math.round(root.crop.height) : "")
       color: Theme.muted
       font.family: Theme.mono
-      font.pixelSize: 10
+      font.pixelSize: Theme.fontPx(10)
     }
   }
 }

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../core"
 
 RowLayout {
   id: root
@@ -9,8 +10,9 @@ RowLayout {
   Layout.fillWidth: true
   Label {
     text: root.title
+    wrapMode: Text.WordWrap
     Layout.fillWidth: true
-    font.pixelSize: 12
+    font.pixelSize: Theme.fontPx(12)
   }
   Toggle {
     text: root.title

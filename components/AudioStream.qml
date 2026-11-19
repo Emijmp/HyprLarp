@@ -11,7 +11,7 @@ ColumnLayout {
   RowLayout {
     Label {
       text: root.node.description || root.node.name
-      font.pixelSize: 12
+      font.pixelSize: Theme.fontPx(12)
       elide: Text.ElideRight
       Layout.fillWidth: true
     }

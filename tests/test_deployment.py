@@ -112,6 +112,22 @@ class DeploymentTests(unittest.TestCase):
     self.assertEqual(self.locations.executable.read_bytes(), old_launcher)
     self.assertEqual((self.locations.app / deployment.MARKER).read_bytes(), old_manifest)
 
+  def test_failed_runtime_validation_restores_code_unit_and_settings(self):
+    self.install()
+    manifest = (self.locations.app / deployment.MARKER).read_bytes()
+    targets = {**self.locations.managed(), 'settings': self.locations.config / 'settings.json'}
+    contents = {role: target.read_bytes() for role, target in targets.items()}
+    stage = self.root / 'candidate'
+    stage.mkdir()
+    deployment.copy_sources(stage)
+    def unhealthy():
+      raise RuntimeError('candidate has no bar')
+    with self.assertRaises(RuntimeError):
+      deployment.commit(self.locations, stage, {**contents, 'service': b'broken unit'}, manifest, activate=unhealthy)
+    for role, target in targets.items():
+      self.assertEqual(target.read_bytes(), contents[role])
+    self.assertEqual((self.locations.app / deployment.MARKER).read_bytes(), manifest)
+
   def test_desktop_file_supports_reserved_characters_in_paths(self):
     self.locations = deployment.Locations.create(self.root / 'space $dollar `tick` "quote" %percent')
     self.install()

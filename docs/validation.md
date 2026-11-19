@@ -82,3 +82,13 @@ El informe incluye CPU expresada sobre un núcleo, RSS, PSS cuando se permite le
 3. Vuelve a HyprLarp y comprueba que recupera la imagen anterior. Waypaper conserva sus reproductores: detén o cambia el vídeo desde ese gestor si corresponde.
 4. Prueba Deshacer/Rehacer y Restablecer sección exclusivamente desde configuración. Restaura el último fondo con el botón y activa/desactiva Restaurar al iniciar. La app independiente no debe restaurarlo automáticamente al abrirse; el botón manual sí debe funcionar.
 5. Reinicia el shell con restauración activada y desactivada. Comprueba que no se añade un sondeo de Waypaper y que el módulo de Fondos sigue disponible.
+
+
+## Historial, diagnóstico y launcher unificado
+
+1. Cambia dos preferencias desde Configuración, reinicia el shell y comprueba Deshacer/Rehacer. Cambia No molestar desde su panel: deshacer la apariencia debe conservar ese estado.
+2. En Perfiles abre Historial de configuración, compara una versión y restáurala. Deshaz la restauración. Comprueba que los diseños de pantallas permanecen iguales.
+3. En General pulsa Comprobar estado y exporta un informe; comprueba también `hyprlarp doctor --json`. Revisa dependencias opcionales, versión, servicios e IPC. No debe aparecer un diálogo de autenticación.
+4. Busca una aplicación, una ventana real y una acción en el launcher. La ventana elegida debe recibir el foco. Prueba `= sqrt(81)+2`, copia el resultado y comprueba `? informe` y una ruta con espacios o Unicode. Cierra el panel durante una búsqueda: no deben reaparecer respuestas antiguas.
+5. Ejecuta `python3 tools/check.py`: incluye los casos de historial persistente, diagnóstico, límites de búsqueda, cálculo y navegación real del launcher contra un backend temporal. La prueba del observador incluye hijos creados desde un hilo de trabajo.
+6. Usa las herramientas de [rendimiento](performance.md) para comparar checkouts y tomar una muestra de cinco minutos de la instancia real. Conserva el modo, panel, configuración y condiciones al comparar; distingue la carga de componentes del primer fotograma.

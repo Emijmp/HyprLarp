@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from backend.service import DEFAULTS, PALETTES, SETTINGS_HISTORY_LIMIT, Service, Store, palette_for, render_lock_config, validate_setting
+from backend.layouts import section_updates
 
 
 class SettingsHistoryTests(unittest.TestCase):
@@ -34,6 +35,28 @@ class SettingsHistoryTests(unittest.TestCase):
     self.assertEqual(self.store.history_state(), {"undo": 0, "redo": 1})
     self.store.update({"font": "Sans Serif"})
     self.assertEqual(self.store.history_state(), {"undo": 1, "redo": 0})
+
+  def test_greeter_layout_persists_and_supports_history_and_appearance_reset(self):
+    self.assertEqual(self.store.settings['greeterLayout'], 'sidebar')
+    self.store.update({'greeterLayout': 'centered'})
+    self.assertEqual(Store(self.directory).settings['greeterLayout'], 'centered')
+    self.assertEqual(self.store.undo()['greeterLayout'], 'sidebar')
+    self.assertEqual(self.store.redo()['greeterLayout'], 'centered')
+    self.store.update(section_updates('Appearance', DEFAULTS, self.store.settings))
+    self.assertEqual(self.store.settings['greeterLayout'], 'sidebar')
+    self.assertEqual(self.store.undo()['greeterLayout'], 'centered')
+    for value in ['unknown', '', {}, [], True, 0, None]:
+      with self.assertRaises(ValueError):
+        validate_setting('greeterLayout', value)
+    self.assertEqual(self.store.settings['greeterLayout'], 'centered')
+
+  def test_appearance_reset_includes_context_theme_and_panel_layout(self):
+    self.store.update({'themeScheduleEnabled': True, 'themeDay': 'paper', 'panelLayout': 'sidebar', 'panelStyle': 'glass', 'panelBlur': True})
+    updates = section_updates('Appearance', DEFAULTS, self.store.settings)
+    self.assertTrue({'themeScheduleEnabled', 'themeDay', 'themeNight', 'themeDayStart', 'themeNightStart', 'panelLayout', 'panelStyle', 'panelBlur'} <= set(updates))
+    self.store.update(updates)
+    for key in ['themeScheduleEnabled', 'panelLayout', 'panelStyle', 'panelBlur']:
+      self.assertEqual(self.store.settings[key], DEFAULTS[key])
 
   def test_invalid_update_does_not_change_settings_or_history(self):
     original = self.store.update({"theme": "tokyonight"})
@@ -137,6 +160,20 @@ class SettingsHistoryTests(unittest.TestCase):
 
 
 class PaletteTests(unittest.TestCase):
+  def test_contextual_themes_panel_layout_performance_and_readability_settings_are_validated(self):
+    self.assertEqual(validate_setting("themeDay", "paper"), "paper")
+    self.assertEqual(validate_setting("themeNight", "amoled"), "amoled")
+    self.assertEqual(validate_setting("themeScheduleEnabled", True), True)
+    self.assertEqual(validate_setting("panelLayout", "sidebar"), "sidebar")
+    self.assertEqual(validate_setting("panelStyle", "glass"), "glass")
+    self.assertEqual(validate_setting("performanceMode", "efficient"), "efficient")
+    self.assertEqual(validate_setting("accessibilityMinimumFontSize", 16), 16)
+    for key, value in [("themeDay", "custom"), ("panelLayout", "unknown"),
+                       ("panelStyle", "blurred"), ("performanceMode", "turbo"),
+                       ("accessibilityMinimumFontSize", 24)]:
+      with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+        validate_setting(key, value)
+
   def test_all_presets_and_custom_theme_are_valid_for_the_lock_screen(self):
     for name in [*PALETTES, "custom"]:
       with self.subTest(theme=name):
@@ -158,7 +195,7 @@ class PaletteTests(unittest.TestCase):
       self.assertEqual(reloaded.settings["customPalette"]["name"], "Personal")
       self.assertEqual(reloaded.settings["customPalette"]["background"], "#aabbcc")
       self.assertEqual(reloaded.settings["accent"], "#123abc")
-      self.assertEqual(reloaded.history_state(), {"undo": 0, "redo": 0})
+      self.assertEqual(reloaded.history_state(), {"undo": 1, "redo": 0})
 
   def test_custom_palette_rejects_missing_roles_names_and_invalid_colors(self):
     cases = []
@@ -207,7 +244,9 @@ class SettingsProtocolTests(unittest.TestCase):
         {"action": "settings-undo", "source": "config"}
       ]
       source = io.StringIO("\n".join(json.dumps(request) for request in requests))
-      with patch("sys.stdin", source), patch.object(service, "poll"), patch.object(service, "sync_watchers"):
+      # serve() owns a process lifetime in production. Keep its shutdown flag
+      # local to this in-process protocol test so later decoder tests can run.
+      with patch("sys.stdin", source), patch.object(service, "poll"), patch.object(service, "sync_watchers"), patch("backend.safety._closing", False):
         service.serve()
       settings = [data for kind, data in events if kind == "settings"]
       self.assertEqual([entry["theme"] for entry in settings], ["amoled", "oxocarbon", "amoled", "oxocarbon", "amoled", "oxocarbon"])

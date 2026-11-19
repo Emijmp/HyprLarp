@@ -118,7 +118,7 @@ ColumnLayout {
   }
   Label {
     text: "El blur se aprecia con una opacidad menor al 100%."
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     color: Theme.muted
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
@@ -159,7 +159,7 @@ ColumnLayout {
   Label {
     text: "Solo actual muestra únicamente el número activo. Los otros modos permiten añadir puntos o números compactos. La rueda recorre todos los espacios del monitor, aunque no se vean."
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     wrapMode: Text.WordWrap
     Layout.fillWidth: true
   }

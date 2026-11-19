@@ -9,7 +9,7 @@ Item {
   property bool divider: false
   signal clicked
   Layout.fillWidth: true
-  implicitHeight: 30
+  implicitHeight: Theme.controlHeight(30)
   activeFocusOnTab: true
   Keys.onReturnPressed: clicked()
   Keys.onSpacePressed: clicked()
@@ -31,12 +31,12 @@ Item {
     anchors.rightMargin: 2
     Label {
       text: root.title
-      font.pixelSize: 12
+      font.pixelSize: Theme.fontPx(12)
       Layout.fillWidth: true
     }
     Label {
       text: root.detail
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       color: Theme.muted
       Layout.maximumWidth: root.width * 0.52
     }
@@ -64,4 +64,9 @@ Item {
   }
   Accessible.role: Accessible.Button
   Accessible.name: title + " " + detail
+  Accessible.onPressAction: if (enabled)
+    clicked()
+  FocusRing {
+    control: root
+  }
 }

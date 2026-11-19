@@ -20,14 +20,14 @@ ColumnLayout {
       spacing: 3
       Label {
         text: peripheral.modelData.name
-        font.pixelSize: 12
+        font.pixelSize: Theme.fontPx(12)
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
       }
       Label {
         text: [peripheral.modelData.manufacturer, peripheral.modelData.vendor + ":" + peripheral.modelData.product, peripheral.modelData.speed ? peripheral.modelData.speed + " Mb/s" : ""].filter(Boolean).join(" · ")
         color: Theme.muted
-        font.pixelSize: 10
+        font.pixelSize: Theme.fontPx(10)
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
       }
@@ -37,7 +37,7 @@ ColumnLayout {
     visible: (Bridge.usb.devices || []).length === 0
     text: Bridge.preview ? "Los dispositivos se consultan en la sesión real." : "Sin dispositivos USB detectados."
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
   }
@@ -47,7 +47,7 @@ ColumnLayout {
       text: "Almacenamiento USB"
       Layout.fillWidth: true
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     ActionButton {
       text: "Actualizar"
@@ -61,7 +61,7 @@ ColumnLayout {
     visible: Bridge.isBusyGroup("usb-")
     text: "Operación en curso…"
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
   Repeater {
     model: Bridge.usb.drives || []
@@ -81,7 +81,7 @@ ColumnLayout {
         visible: !!drive.modelData.protected
         text: "Unidad del sistema: acciones deshabilitadas."
         color: Theme.muted
-        font.pixelSize: 11
+        font.pixelSize: Theme.fontPx(11)
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
       }
@@ -95,12 +95,12 @@ ColumnLayout {
           Label {
             text: volume.modelData.name
             Layout.fillWidth: true
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontPx(12)
           }
           Label {
             text: (volume.modelData.filesystem || "Sin sistema de archivos") + " · " + Format.bytes(volume.modelData.size) + (volume.modelData.readOnly ? " · Solo lectura" : "")
             color: Theme.muted
-            font.pixelSize: 10
+            font.pixelSize: Theme.fontPx(10)
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
           }
@@ -110,7 +110,7 @@ ColumnLayout {
             color: Theme.muted
             Layout.fillWidth: true
             wrapMode: Text.WrapAnywhere
-            font.pixelSize: 10
+            font.pixelSize: Theme.fontPx(10)
           }
           ValueRow {
             visible: volume.modelData.free !== null
@@ -161,6 +161,7 @@ ColumnLayout {
   }
   EmptyState {
     visible: (Bridge.usb.drives || []).length === 0
+    error: !Bridge.usb.available || !!Bridge.usb.error
     title: Bridge.usb.available ? "Sin unidades USB" : "Servicio USB no disponible"
     description: Bridge.usb.error || (Bridge.usb.available ? "Conecta una unidad de almacenamiento." : "Requiere UDisks y python-gobject.")
   }

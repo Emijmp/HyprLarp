@@ -1,5 +1,7 @@
 # Consumo y verificación
 
+El [panel de rendimiento](performance-panel.md) permite consultar el consumo actual de HyprLarp y guardar comparaciones desde la interfaz. Las mediciones históricas y el benchmark CLI de este documento conservan su alcance original.
+
 Medición local de la revisión 0.3 del 1 de noviembre de 2026, con Quickshell 0.3.2, Qt 6.12, Linux y el tema AMOLED. La muestra inicial corresponde a la barra anterior, con consultas al sistema cada 2 segundos. La muestra final incluye los fondos individuales de módulos y las integraciones por eventos.
 
 | Muestra | CPU de un núcleo | RSS al final | Pico RSS muestreado | Comandos externos en 12 s |
@@ -37,7 +39,7 @@ No se fuerza software rendering, baja resolución, reducción de calidad ni un l
 
 ## Comprobaciones
 
-`python3 tools/check.py` pasa las pruebas de lógica, verifica la sintaxis Lua con Hyprland instalado y abre los 18 paneles, las 7 páginas de configuración, las 4 posiciones de barra, los 6 temas incluidos y el personalizado, casos de geometría y una barra vacía. Comprueba añadir, quitar y reordenar módulos; también deshacer/rehacer cambios pendientes y guardados, agrupar sliders, revertir un reset y editar paletas. Verifica que esas acciones se deshabilitan al enfocar otra ventana u ocultar configuración y que conservan los cambios hechos desde otros paneles. El historial está limitado a 50 cambios en memoria, guarda únicamente las claves modificadas y trabaja cuando se guardan ajustes. Las pruebas del modelo de espacios cubren varios monitores, espacios con nombre, números fuera del rango configurado y comandos de activación.
+`python3 tools/check.py` pasa las pruebas de lógica, verifica la sintaxis Lua con Hyprland instalado y abre los 19 paneles, las 8 páginas de configuración, las 4 posiciones de barra, los 6 temas incluidos y el personalizado, casos de geometría y una barra vacía. Comprueba añadir, quitar y reordenar módulos; también deshacer/rehacer cambios pendientes y guardados, agrupar sliders, revertir un reset y editar paletas. Verifica que esas acciones se deshabilitan al enfocar otra ventana u ocultar configuración y que conservan los cambios hechos desde otros paneles. El historial conserva hasta 50 cambios de claves, con persistencia después de cada edición. Las 30 versiones completas comparten un archivo privado limitado a 6 MiB; no hay sondeos ni procesos adicionales para mantenerlo. Las pruebas del modelo de espacios cubren varios monitores, espacios con nombre, números fuera del rango configurado y comandos de activación.
 
 La validación con cambios de monitor y servicios físicos debe hacerse en una sesión real de Hyprland; la comprobación offscreen no ejecuta esas acciones.
 
@@ -101,3 +103,63 @@ Al seleccionar Externo, el `LazyLoader` destruye la superficie nativa de fondo y
 ## Separación de ventanas
 
 Los controles de separación no añaden sondeos ni procesos residentes. Las actualizaciones se agrupan en la cola existente del backend y solo se aplican si cambian los valores efectivos. Se escribe el archivo privado únicamente cuando difiere; la interacción usa una llamada acotada a `hyprctl eval`. Solo desactivar una personalización activa requiere recargar Hyprland. El archivo de datos se lee al cargar la configuración, sin añadirlo al observador de archivos Lua del compositor.
+
+## Pantallas y proyección
+
+Las pantallas se consultan al abrir el editor, al iniciar y tras eventos de conexión o recarga. Los eventos próximos se agrupan durante 350 ms. El editor mantiene un borrador y el esquema solo dibuja las salidas conectadas. El temporizador independiente existe durante una prueba de imagen; se retira al confirmar, cancelar o vencer los 20 segundos. No hay consultas periódicas de monitores en reposo.
+
+## Herramientas de medición y revisión de noviembre de 2026
+
+```sh
+# Vista previa aislada; abre el panel después de tres segundos de calentamiento.
+python3 tools/benchmark.py --panel launcher --seconds 30 --output /tmp/launcher-before.json
+python3 tools/benchmark.py --panel launcher --seconds 30 --compare /tmp/launcher-before.json --output /tmp/launcher-after.json
+
+# Vista previa en una sesión Wayland real, con el renderizador nativo.
+python3 tools/benchmark.py --native --panel launcher --seconds 30 --output /tmp/launcher-wayland.json
+
+# Lectura de una instancia real ya abierta; no cambia sus paneles ni procesos.
+python3 tools/benchmark.py --pid PID --seconds 300 --output /tmp/hyprlarp-native.json
+
+# Comparación del algoritmo; requiere una copia del archivo anterior.
+node tools/search_benchmark.js /ruta/al/fuzzy-anterior.js
+```
+
+`--root` permite medir otro checkout con el mismo observador. `--interval` controla el muestreo entre 0,2 y 10 segundos. `--compare` exige el mismo modo y panel y añade diferencias numéricas al informe. Una referencia inexistente se rechaza antes de abrir la vista previa.
+
+El observador recorre únicamente los procesos medidos y los hijos creados por cualquiera de sus hilos, en lugar de inspeccionar todos los procesos del equipo en cada muestra. Comprueba la identidad del PID y cuenta también el tiempo de hijos terminados recogido por sus padres. Informa del número de procesos e hilos, la resolución de los ticks de CPU, RSS, PSS y contadores GPU disponibles.
+
+Las variables de medición habilitan marcas puntuales para `backend_ready_ms` y `panel_load_ms`. La segunda mide desde la solicitud del panel hasta que carga su componente; ninguna mide el primer fotograma ni acredita FPS. Las marcas están desactivadas en el uso normal.
+
+Las optimizaciones del launcher preparan palabras y metadatos una sola vez, reutilizan dos filas de la distancia de edición, limitan a 16 las búsquedas en caché y liberan esa caché al cerrar. Los iconos de respaldo se solicitan por lotes únicamente para las filas visibles. La carga de los paneles es asíncrona. Archivos y calculadora se atienden bajo demanda; no añaden un indexador ni temporizadores permanentes. El historial y el diagnóstico tampoco realizan trabajo periódico.
+
+La comparación de JavaScript comprueba que ambas versiones producen la misma suma de resultados y publica la mediana de cinco muestras. Se ejecuta dentro de cada contexto JavaScript para evitar medir llamadas entre contextos por cada entrada. Node utiliza un motor distinto de QML: el resultado describe el algoritmo y no el consumo total del escritorio.
+
+Referencia: [perfilado y rendimiento de Qt Quick](https://doc.qt.io/qt-6/qtquick-performance.html#profiling).
+
+### Comparación del launcher · 16 de noviembre de 2026
+
+Se comparó una copia del checkout anterior con la revisión ampliada, usando el mismo observador, valores iniciales aislados y Qt 6.12 / Quickshell 0.3.2 offscreen/software. Cada proceso tuvo tres segundos de calentamiento; se abrió el launcher y se midieron los 20 segundos siguientes. Se repitió el par con procesos nuevos. La muestra incluye la carga diferida de los iconos tras abrir el panel; no es una medición exclusiva de reposo estable.
+
+| Muestra | CPU sobre un núcleo | RSS final | Pico RSS muestreado | PSS final |
+| --- | ---: | ---: | ---: | ---: |
+| Anterior 1 | 5,70% | 185,99 MiB | 260,39 MiB | 134,60 MiB |
+| Actual 1 | 0,10% | 142,02 MiB | 142,50 MiB | 90,60 MiB |
+| Anterior 2 | 5,45% | 214,85 MiB | 287,93 MiB | 163,35 MiB |
+| Actual 2 | 0,10% | 141,85 MiB | 142,35 MiB | 90,57 MiB |
+
+No hubo comandos externos dentro de esas ventanas de medida. La resolución de CPU fue de 10 ms; los contadores GPU no estaban disponibles en offscreen. La variación de la versión anterior y estas dos repeticiones no permiten extrapolar un porcentaje de mejora a todos los equipos o sesiones. Los datos originales se guardaron localmente en `.runtime/improvements/controlled-{before,after}*.json` y `comparison.json`.
+
+Una comprobación adicional con Wayland y renderizador nativo confirmó el funcionamiento del observador y sus contadores DRM. La carga del componente del launcher tardó 187 ms y el backend estuvo listo en 282 ms en esa ejecución. Su ventana de recursos fue de solo dos segundos: sirve para validar la herramienta y no para caracterizar el consumo sostenido.
+
+El comparador de JavaScript evaluó 700 nombres y 28.000 combinaciones por muestra, con cinco repeticiones: mediana anterior 184,61 ms y actual 176,47 ms. La mejora observada fue del 4,41% para ese conjunto; ambas versiones produjeron los mismos resultados. No mide la interfaz ni acredita esa reducción sobre toda la CPU del escritorio.
+
+### Sesión real posterior a la actualización
+
+La instalación de usuario se activó y se comprobó su IPC y la conexión con el backend. Después de abrir y cerrar el launcher se observaron 300 segundos con los paneles cerrados, conservando los ajustes personales. La medición leyó cinco procesos del árbol del shell y 31 hilos en Linux 7.3.4 / Qt 6.12 / Quickshell 0.3.2.
+
+| Duración | CPU sobre un núcleo | RSS final / pico muestreado | PSS final |
+| --- | ---: | ---: | ---: |
+| 300 s | 0,38% | 302,85 / 302,85 MiB | 196,79 MiB |
+
+Los contadores DRM de los motores observados redondearon a 0,00%; no significa consumo absoluto cero ni describe la ocupación global de la GPU. La medición corresponde al árbol del shell con sus servicios reales, a diferencia de las muestras offscreen anteriores. El servicio siguió activo, sin reinicios automáticos ni errores de ejecución registrados durante la validación. Informe local: `.runtime/improvements/native-final-300s.json`.

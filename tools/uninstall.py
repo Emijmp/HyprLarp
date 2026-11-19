@@ -11,9 +11,13 @@ import subprocess
 from deployment import ROOT, Locations, MARKER, digest, load_manifest, no_symlinks, read_json, deployment_lock
 from backend.safety import idle_processes
 from backend.service import lua_string
+from backend import recovery
 
 
 def stop_runtime(locations):
+  binary = shutil.which('quickshell') or shutil.which('qs')
+  if not locations.prefix and binary:
+    recovery.stop(locations.app, binary, destination=locations.managed()['service'])
   hyprctl = shutil.which('hyprctl')
   if hyprctl:
     owned = lua_string(str(locations.app / 'config/bindings-runtime.lua'))
@@ -67,6 +71,8 @@ def _uninstall(locations, *, dry_run=False, purge=False, stop=True):
     stop_runtime(locations)
   for path in removable:
     path.unlink()
+  if stop and not locations.prefix:
+    recovery.run(['systemctl', '--user', 'daemon-reload'], check=False)
   for name in manifest['files']:
     source = locations.app / name
     if source.suffix == '.py':

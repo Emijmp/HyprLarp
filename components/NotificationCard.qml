@@ -6,6 +6,10 @@ Rectangle {
   id: root
   required property var entry
   property bool toast: false
+  Accessible.role: toast ? Accessible.AlertMessage : Accessible.Grouping
+  Accessible.name: entry.app + " · " + entry.summary + (entry.body ? " · " + entry.body : "")
+  Component.onCompleted: if (toast)
+    Accessible.announce(Accessible.name, entry.urgency === 2 ? Accessible.Assertive : Accessible.Polite)
   readonly property int padding: toast ? 12 : 0
   implicitHeight: content.implicitHeight + padding * 2 + 9
   color: Theme.surface
@@ -31,13 +35,13 @@ Rectangle {
     RowLayout {
       Label {
         text: root.entry.app
-        font.pixelSize: 11
+        font.pixelSize: Theme.fontPx(11)
         color: Theme.muted
         Layout.fillWidth: true
       }
       Label {
-        text: Qt.formatDateTime(new Date(root.entry.time), "hh:mm")
-        font.pixelSize: 10
+        text: Clock.formatTime(new Date(root.entry.time))
+        font.pixelSize: Theme.fontPx(10)
         color: Theme.muted
         font.family: Theme.mono
       }
@@ -45,7 +49,7 @@ Rectangle {
         icon: "close"
         hint: "Descartar"
         implicitWidth: 22
-        implicitHeight: 22
+        implicitHeight: Theme.controlHeight(22)
         onClicked: {
           Notices.dismiss(root.entry.id, root.entry.token);
           if (!root.toast)
@@ -55,7 +59,7 @@ Rectangle {
     }
     Label {
       text: root.entry.summary
-      font.pixelSize: 12
+      font.pixelSize: Theme.fontPx(12)
       font.weight: Font.Medium
       wrapMode: Text.WordWrap
       Layout.fillWidth: true
@@ -66,7 +70,7 @@ Rectangle {
       wrapMode: Text.WordWrap
       maximumLineCount: root.toast ? 3 : 7
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       Layout.fillWidth: true
     }
     Flow {

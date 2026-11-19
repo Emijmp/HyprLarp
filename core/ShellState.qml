@@ -5,6 +5,7 @@ import Quickshell
 Singleton {
   id: root
   property string panel: Bridge.preview ? (Quickshell.env("HYPRLARP_START_PANEL") ?? "control") : ""
+  property double panelRequestedAt: 0
   property bool settingsOpen: Bridge.settingsOnly
   property var activeScreen: null
   readonly property bool vertical: ["left", "right"].indexOf(Bridge.settings.barPosition) !== -1
@@ -58,10 +59,11 @@ Singleton {
   }
   function syncPanel() {
     Bridge.send("panel", {
-      name: panel
+      name: Resilience.blocked("panel:" + panel) ? "" : panel
     });
   }
   onPanelChanged: {
+    panelRequestedAt = Date.now();
     if (panel !== "session")
       sessionRequest = "";
     if (panel !== "clipboard")
@@ -79,19 +81,21 @@ Singleton {
   property int captureRemaining: 0
   property var captureOptions: ({
       mode: "region",
-      annotate: false
+      annotate: false,
+      freeze: false
     })
   function cancelCapture() {
     countdown.stop();
     captureTimer.stop();
     captureRemaining = 0;
   }
-  function capture(mode, delay, annotate) {
+  function capture(mode, delay, annotate, frozen) {
     cancelCapture();
     close();
     captureOptions = {
       mode: mode,
-      annotate: annotate === true
+      annotate: annotate === true,
+      freeze: frozen === true
     };
     captureRemaining = Math.max(0, Math.min(10, Number(delay) || 0));
     if (captureRemaining)

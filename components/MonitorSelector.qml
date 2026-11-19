@@ -17,7 +17,7 @@ ColumnLayout {
     Label {
       text: "Los ajustes sin modificar heredan los valores base."
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       wrapMode: Text.WordWrap
       Layout.fillWidth: true
     }

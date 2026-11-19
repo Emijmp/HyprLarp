@@ -8,7 +8,7 @@ ToolTip {
   delay: 600
   contentItem: Label {
     text: root.text
-    font.pixelSize: 10
+    font.pixelSize: Theme.fontPx(10)
   }
   background: Rectangle {
     color: Theme.surface

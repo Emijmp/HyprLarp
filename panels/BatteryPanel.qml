@@ -105,7 +105,7 @@ ColumnLayout {
         visible: !!pack.b.capacityEstimated
         text: "Capacidades estimadas a partir de carga y voltaje."
         color: Theme.muted
-        font.pixelSize: 10
+        font.pixelSize: Theme.fontPx(10)
         wrapMode: Text.WordWrap
         Layout.fillWidth: true
       }

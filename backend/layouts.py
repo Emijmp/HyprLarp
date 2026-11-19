@@ -9,14 +9,14 @@ BAR_KEYS = {"barEnabled", "barPosition", "barSize", "barMargins", "barPaddingX",
   "barZones", "moduleOpacity", "moduleBackgroundOpacity", "moduleBorderWidth", "modulePaddingX",
   "modulePaddingY", "moduleRadius", "moduleOpacities"}
 SECTIONS = {
-  "Appearance": {"decoration", "decorationOptions", "theme", "accent", "customPalette", "font", "radius", "cornerRadii", "panelOpacity", "animations", "windowGapsEnabled", "windowGapsIn", "windowGapsOut", "windowGapsLinked"},
+  "Appearance": {"decoration", "decorationOptions", "theme", "themeScheduleEnabled", "themeDay", "themeNight", "themeDayStart", "themeNightStart", "accent", "customPalette", "font", "greeterLayout", "panelLayout", "panelStyle", "panelBlur", "radius", "cornerRadii", "panelOpacity", "animations", "windowGapsEnabled", "windowGapsIn", "windowGapsOut", "windowGapsLinked"},
   "Bar": {key for key in BAR_KEYS if key.startswith("bar") and key not in {"barModules", "barZones"}},
   "Modules": {"barModules", "barZones", "disabledModules", "moduleOpacity", "moduleOpacities",
     "moduleBackgroundOpacity", "moduleBorderWidth", "modulePaddingX", "modulePaddingY", "moduleRadius", "trayHiddenItems"},
   "Wallpapers": {"wallpaper", "wallpaperDirectory", "wallpaperProvider", "waypaperRestoreOnStartup"},
   "Shortcuts": {"shortcuts", "customBindings", "migrateNoctaliaBinds"},
   "General": {"osdEnabled", "osdTimeout", "osdPosition", "nightLightEnabled", "nightLightTemperature", "nightLightSchedule", "nightLightStart", "nightLightEnd", "clipboardEnabled", "clipboardPaused", "clipboardRetentionHours", "notificationHistoryLimit",
-    "notificationRules", "showAppIcons"}
+    "notificationRules", "showAppIcons", "accessibilityTextScale", "accessibilityHighContrast", "accessibilityReducedMotion", "accessibilityLargeTargets", "clockFormat", "clockSeconds", "clockDateFormat", "calendarFirstDay", "calendarWeekNumbers", "batteryAlertsEnabled", "batteryAlertLevels"}
 }
 
 

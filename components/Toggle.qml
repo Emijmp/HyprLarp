@@ -4,8 +4,9 @@ import "../core"
 
 CheckBox {
   id: root
-  implicitWidth: 24
-  implicitHeight: 26
+  implicitWidth: Theme.controlHeight(24)
+  implicitHeight: Theme.controlHeight(26)
+  activeFocusOnTab: true
   padding: 0
   contentItem: Item {}
   indicator: Rectangle {
@@ -27,4 +28,7 @@ CheckBox {
     }
   }
   Accessible.name: text
+  FocusRing {
+    control: root
+  }
 }

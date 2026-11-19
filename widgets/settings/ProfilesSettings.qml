@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Dialogs
 import "../../core"
 import "../../components"
+import "." as SettingsControls
 
 ColumnLayout {
   id: root
@@ -35,7 +36,7 @@ ColumnLayout {
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
   SectionTitle {
     text: "Perfiles"
@@ -168,5 +169,9 @@ ColumnLayout {
       root.pendingPath = selectedFile.toString();
       Qt.callLater(root.finishFile);
     }
+  }
+  Rule {}
+  SettingsControls.RevisionHistory {
+    Layout.fillWidth: true
   }
 }

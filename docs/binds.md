@@ -44,13 +44,19 @@ El preludio registra los handlers al declararse; debe cargarse antes de los bind
 | Super + Coma | Configuración |
 | Super + X | Sesión |
 | Super + V | Portapapeles |
-| Impr Pant | Capturar región |
+| Impr Pant | Capturar región dinámica: la pantalla sigue actualizándose |
+| Ctrl + Impr Pant | Capturar región estática: la pantalla se congela durante la selección |
+| Shift + Impr Pant | Capturar escritorio completo |
 | Super + Ctrl + M | Multimedia |
 | Super + T / Q / E | Terminal / cerrar ventana / explorador, desde tu archivo actual |
 | Super + S / Super + Shift + S | Abrir espacio especial / mover ventana a él, desde tu archivo actual |
 | Super + números y sus variantes | Espacios, desde tu archivo actual |
 
 Se conservan también las teclas de movimiento, ratón, micrófono y reproducción que ya declares. El generador no añade binds de espacios ni redefine todas las teclas multimedia.
+
+En **Capturas → Modo de captura** puedes elegir Dinámica o Estática también al usar el temporizador y el editor. Los atajos directos conservan siempre su propio modo; Esc cancela la selección. Puedes reasignarlos en Configuración → Atajos. Para scripts: `hyprlarp screenshot-region --freeze` equivale a `hyprlarp screenshot-region-frozen`; `screenshot-window` y `screenshot-screen` también admiten `--freeze`.
+
+El modo estático usa `hyprpicker` únicamente mientras seleccionas una región, después del temporizador si lo activaste. Las capturas de ventana y escritorio se toman inmediatamente, sin selector. La congelación termina antes de abrir el editor y también al cancelar o fallar la captura; las aplicaciones siguen ejecutándose. Si falta `hyprpicker`, se indica cómo instalarlo y el modo dinámico sigue disponible. La implementación sigue el mecanismo de congelación documentado en [hyprpicker](https://github.com/hyprwm/hyprpicker), con verificación de las superficies antes de abrir el selector y limpieza del proceso propio.
 
 **Transferir las acciones de Noctalia a HyprLarp** reconoce sus comandos de launcher, centro de control, sesión, configuración, portapapeles y capturas. Las funciones de repetición que construyen comandos de volumen/brillo siguen funcionando con sus mismos callbacks y frecuencia; el adaptador cambia la acción a `wpctl` o `brightnessctl`. No se ejecuta un cliente Noctalia por pulsación para esas acciones. Alt + Tab conserva su combinación y pasa a recorrer ventanas mediante `hl.dsp.window.cycle_next()`; el selector visual de Noctalia no forma parte del shell.
 

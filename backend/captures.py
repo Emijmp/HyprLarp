@@ -1,6 +1,7 @@
 """Capture drafts and bounded geometric annotations, only on explicit actions."""
 
 import datetime as dt
+from contextlib import contextmanager, nullcontext
 import html
 import json
 import math
@@ -10,7 +11,62 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 import uuid
+
+try:
+  from .safety import managed_process
+except ImportError:
+  from safety import managed_process
+
+
+def prepare_selection(api):
+  # Reuses a named runtime rule; no accumulation or edits to the user's config.
+  api.command(["hyprctl", "eval", 'hl.layer_rule({name="hyprlarp-capture-selection", '
+    'match={namespace="^(hyprpicker|selection)$"}, no_anim=true})'])
+
+
+def frozen_layers(layers, pid, outputs):
+  """Require this helper's mapped surface on every captured output."""
+  if not isinstance(layers, dict):
+    return False
+  def visible(value):
+    if isinstance(value, dict):
+      if (value.get("namespace") == "hyprpicker" and value.get("pid") == pid
+          and value.get("w", 0) > 0 and value.get("h", 0) > 0 and value.get("alpha", 0) >= 0.999):
+        return True
+      return any(visible(child) for child in value.values())
+    return isinstance(value, list) and any(visible(child) for child in value)
+  return bool(outputs) and all(visible(layers.get(name)) for name in outputs)
+
+
+@contextmanager
+def freeze_outputs(api):
+  if not shutil.which("hyprpicker"):
+    raise RuntimeError("Instala hyprpicker para usar la captura estática")
+  monitors = json.loads(api.command(["hyprctl", "-j", "monitors"]))
+  outputs = {monitor["name"] for monitor in monitors if not monitor.get("disabled")
+    and monitor.get("mirrorOf", "none") in {"none", "", None}}
+  if not outputs:
+    raise RuntimeError("No hay pantallas disponibles para congelar")
+  # Hyprland's layer JSON reports target alpha, not the current fade animation.
+  # Disable entry/exit animation so neither live pixels nor selector traces leak.
+  prepare_selection(api)
+  with managed_process(["hyprpicker", "--render-inactive", "--no-zoom", "--quiet"]) as process:
+    deadline = time.monotonic() + 3
+    while True:
+      if process.poll() is not None:
+        raise RuntimeError("No se pudo congelar la pantalla con hyprpicker")
+      layers = json.loads(api.command(["hyprctl", "-j", "layers"], timeout=1))
+      if frozen_layers(layers, process.pid, outputs):
+        break
+      if time.monotonic() >= deadline:
+        raise RuntimeError("La pantalla no estuvo lista para la captura estática")
+      time.sleep(0.03)
+    # Layer mapping alone precedes presentation: allow two frames to be shown.
+    slowest = min((max(20, monitor.get("refreshRate", 60)) for monitor in monitors), default=60)
+    time.sleep(2 / slowest)
+    yield process
 
 
 def window_geometry(window):
@@ -57,6 +113,7 @@ class Captures:
   def __init__(self, service, api):
     self.s, self.api = service, api
     self.lock = threading.RLock()
+    self.capture_lock = threading.Lock()
     self.drafts = {}
     self.directory = service.store.directory / "capture-drafts"
     # Drafts from an interrupted shell are never published as finished captures.
@@ -83,32 +140,58 @@ class Captures:
     if mode not in {"region", "screen", "window"}:
       raise ValueError("Tipo de captura desconocido")
     annotate = data.get("annotate", False) is True
+    frozen = data.get("freeze", False)
+    if not isinstance(frozen, bool):
+      raise ValueError("El modo estático debe ser booleano")
     if annotate and not shutil.which("magick"):
       raise RuntimeError("Instala ImageMagick para editar capturas")
-    argv = ["grim"]
-    if mode == "region":
-      geometry = self.api.command(["slurp"], timeout=120)
-      if not geometry:
-        return
-      argv += ["-g", geometry]
-    elif mode == "window":
-      argv += ["-g", window_geometry(json.loads(self.api.command(["hyprctl", "-j", "activewindow"])))]
-    if annotate:
-      self.api.private_directory(self.directory)
-      token = uuid.uuid4().hex
-      path = self.directory / (token + ".png")
-    else:
-      path = self.destination()
-    self.api.command(argv + [str(path)])
-    if annotate:
-      path.chmod(0o600)
-      dimensions = self.api.command(["magick", "identify", "-format", "%w %h", str(path)]).split()
-      width, height = map(int, dimensions)
-      with self.lock:
-        self.drafts[token] = {"path": path, "width": width, "height": height}
-      self.s.emit("capture-edit", {"token": token, "url": path.as_uri(), "width": width, "height": height})
-    else:
-      self.copy(path)
+    if not self.capture_lock.acquire(blocking=False):
+      raise RuntimeError("Ya hay una captura en curso; termina o cancela con Esc")
+    path, published = None, False
+    try:
+      argv = ["grim"]
+      # Resolve the active window before the freeze helper takes keyboard focus.
+      if mode == "window":
+        argv += ["-g", window_geometry(json.loads(self.api.command(["hyprctl", "-j", "activewindow"])))]
+      if mode == "region" and not frozen:
+        prepare_selection(self.api)
+      with freeze_outputs(self.api) if frozen and mode == "region" else nullcontext() as overlay:
+        if mode == "region":
+          # slurp returns nonzero for Esc/right click; an empty selection is not an error.
+          geometry = self.api.command(["slurp"], timeout=120, check=False)
+          if not geometry:
+            return
+          if not re.fullmatch(r"-?\d+,-?\d+ [1-9]\d*x[1-9]\d*", geometry):
+            raise ValueError("La selección de captura no es válida")
+          argv += ["-g", geometry]
+        if overlay is not None and overlay.poll() is not None:
+          raise RuntimeError("Se canceló la captura estática porque la pantalla dejó de estar congelada")
+        if annotate:
+          self.api.private_directory(self.directory)
+          token = uuid.uuid4().hex
+          path = self.directory / (token + ".png")
+        else:
+          path = self.destination()
+        self.api.command(argv + [str(path)])
+      # Release the frozen view before publishing or opening the editor.
+      if annotate:
+        path.chmod(0o600)
+        dimensions = self.api.command(["magick", "identify", "-format", "%w %h", str(path)]).split()
+        width, height = map(int, dimensions)
+        with self.lock:
+          self.drafts[token] = {"path": path, "width": width, "height": height}
+        published = True
+        self.s.emit("capture-edit", {"token": token, "url": path.as_uri(), "width": width, "height": height})
+      else:
+        # A clipboard error must not remove an otherwise successfully saved PNG.
+        published = True
+        self.copy(path)
+    finally:
+      try:
+        if path is not None and not published:
+          path.unlink(missing_ok=True)
+      finally:
+        self.capture_lock.release()
 
   def handle(self, action, data):
     if action not in {"capture-save", "capture-discard"}:

@@ -13,7 +13,7 @@ Item {
     spacing: 8
     Label {
       text: Media.player ? Media.title : "Sin reproducción activa"
-      font.pixelSize: 14
+      font.pixelSize: Theme.fontPx(14)
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
     }
@@ -22,7 +22,7 @@ Item {
       text: Media.artist
       color: Theme.muted
       Layout.fillWidth: true
-      font.pixelSize: 12
+      font.pixelSize: Theme.fontPx(12)
     }
     RowLayout {
       visible: Media.player !== null

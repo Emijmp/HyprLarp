@@ -5,10 +5,14 @@ import "../components"
 
 ColumnLayout {
   spacing: 18
+  ActionButton {
+    text: "Rendimiento de HyprLarp"
+    onClicked: ShellState.open("performance")
+  }
   Label {
     text: Bridge.system.hostname || "Sin datos del sistema"
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
   StatMeter {
     title: "CPU"
@@ -34,7 +38,7 @@ ColumnLayout {
     Label {
       text: Bridge.system.download === undefined ? "N/D" : Bridge.system.download + " KiB/s"
       font.family: Theme.mono
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       color: Theme.muted
     }
   }
@@ -46,7 +50,7 @@ ColumnLayout {
     Label {
       text: Bridge.system.upload === undefined ? "N/D" : Bridge.system.upload + " KiB/s"
       font.family: Theme.mono
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       color: Theme.muted
     }
   }
@@ -58,7 +62,7 @@ ColumnLayout {
     Label {
       text: Bridge.system.temperature === null || Bridge.system.temperature === undefined ? "N/D" : Bridge.system.temperature + " °C"
       font.family: Theme.mono
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       color: Theme.muted
     }
   }
@@ -70,7 +74,7 @@ ColumnLayout {
     Label {
       text: Bridge.system.uptime === undefined ? "N/D" : Math.floor(Bridge.system.uptime / 3600) + " h " + Math.floor(Bridge.system.uptime % 3600 / 60) + " min"
       font.family: Theme.mono
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       color: Theme.muted
     }
   }

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run backend tests and compile every interactive QML panel offscreen."""
 
+import argparse
 import os
 from pathlib import Path
 import shutil
@@ -13,9 +14,17 @@ GUI_TIMEOUT = 90
 
 
 def main() -> int:
-  result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], cwd=ROOT)
-  if result.returncode:
-    return result.returncode
+  parser = argparse.ArgumentParser(description=__doc__)
+  mode = parser.add_mutually_exclusive_group()
+  mode.add_argument("--backend-only", action="store_true", help="Solo lógica e instalación aislada")
+  mode.add_argument("--ui-only", action="store_true", help="Solo comprobaciones de interfaz")
+  args = parser.parse_args()
+  if not args.ui_only:
+    result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], cwd=ROOT)
+    if result.returncode:
+      return result.returncode
+  if args.backend_only:
+    return 0
   binary = shutil.which("quickshell") or shutil.which("qs")
   if not binary:
     print("Quickshell no está instalado; falta verificar la interfaz.", file=sys.stderr)
@@ -28,6 +37,7 @@ def main() -> int:
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QT_QUICK_BACKEND": "software",
            "XDG_RUNTIME_DIR": temporary, "HYPRLARP_STATE_DIR": str(Path(temporary) / "settings"),
            "HYPRLARP_PREVIEW": "1", "HYPRLARP_SMOKE_TEST": "1", "HYPRLARP_CAPTURE": "",
+           "HYPRLARP_TEST_FILE_QUERY": str(wallpapers) + "/imagen", "HYPRLARP_TEST_FILE_PATH": str(image),
            "HYPRLARP_TEST_WALLPAPERS": str(wallpapers), "HYPRLARP_TEST_WALLPAPER_URL": image.as_uri()}
     environment.pop("WAYLAND_DISPLAY", None)
     try:

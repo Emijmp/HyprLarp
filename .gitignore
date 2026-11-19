@@ -3,4 +3,7 @@ __pycache__/
 .runtime/
 .preview/
 *.log
-
+.codex/
+*.backup-*
+*.bak
+*.tmp

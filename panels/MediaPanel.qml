@@ -12,7 +12,7 @@ ColumnLayout {
     visible: Media.player === null
     text: "Los reproductores con MPRIS aparecerán aquí."
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     wrapMode: Text.WordWrap
     Layout.fillWidth: true
   }
@@ -33,7 +33,7 @@ ColumnLayout {
       Label {
         text: Media.time(Media.player ? Media.player.position : 0)
         color: Theme.muted
-        font.pixelSize: 10
+        font.pixelSize: Theme.fontPx(10)
         font.family: Theme.mono
       }
       Item {
@@ -42,7 +42,7 @@ ColumnLayout {
       Label {
         text: Media.time(Media.player ? Media.player.length : 0)
         color: Theme.muted
-        font.pixelSize: 10
+        font.pixelSize: Theme.fontPx(10)
         font.family: Theme.mono
       }
     }

@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 import json
 from pathlib import Path
 import shutil
@@ -42,7 +43,7 @@ class FeatureTests(unittest.TestCase):
     self.assertFalse(required & set(DEFAULTS["barModules"]))
 
   def test_module_catalog_covers_lazy_panels_config_pages_and_safe_session_actions(self):
-    pages = {"Appearance", "Bar", "Modules", "Wallpapers", "Shortcuts", "General", "Profiles"}
+    pages = {"Appearance", "Bar", "Modules", "Wallpapers", "Shortcuts", "General", "Profiles", "Displays"}
     for entry in MODULE_DEFINITIONS:
       self.assertTrue(entry["title"] and entry["description"] and entry["icon"])
       if entry["kind"] == "panel":
@@ -219,6 +220,35 @@ class FeatureTests(unittest.TestCase):
     self.store.reset()
     self.config("settings-import", {"path": str(file)})
     self.assertEqual(self.store.settings["customPalette"]["accent"], "#ffffff")
+
+  def test_saving_and_exporting_scheduled_theme_preserves_what_is_visible(self):
+    self.store.update({"theme": "amoled", "themeScheduleEnabled": True, "themeDay": "paper"})
+    with patch("backend.theme_context.datetime") as clock:
+      clock.now.return_value = datetime(2026, 11, 18, 12)
+      self.config("theme-save", {"name": "Visible"})
+      file = self.directory / "visible.json"
+      self.config("settings-export", {"path": str(file), "kind": "theme"})
+    saved = self.service.features.library["themes"]["Visible"]
+    exported = json.loads(file.read_text())["palette"]
+    self.assertEqual(saved["surface"], self.service.features.api.PALETTES["paper"]["surface"])
+    self.assertEqual(exported["surface"], saved["surface"])
+    self.assertEqual(exported["accent"], saved["accent"])
+    self.assertTrue(self.store.settings["themeScheduleEnabled"])
+    self.assertFalse(self.errors())
+
+  def test_using_and_importing_manual_themes_disables_schedule_and_is_undoable(self):
+    self.config("theme-save", {"name": "Manual"})
+    file = self.directory / "manual.json"
+    self.config("settings-export", {"path": str(file), "kind": "theme"})
+    for action, data in [("theme-use", {"name": "Manual"}), ("settings-import", {"path": str(file)})]:
+      with self.subTest(action=action):
+        self.store.update({"themeScheduleEnabled": True})
+        self.config(action, data)
+        self.assertEqual(self.store.settings["theme"], "custom")
+        self.assertFalse(self.store.settings["themeScheduleEnabled"])
+        self.config("settings-undo")
+        self.assertTrue(self.store.settings["themeScheduleEnabled"])
+    self.assertFalse(self.errors())
 
   def test_launcher_favorites_and_usage_survive_backend_restart(self):
     for action in ("launcher-favorite", "launcher-used", "launcher-used"):

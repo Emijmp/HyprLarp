@@ -1,5 +1,6 @@
 import QtQuick
 import "../core"
+import "../components"
 
 Item {
   id: root
@@ -12,18 +13,34 @@ Item {
   implicitHeight: vertical ? column.implicitHeight : row.implicitHeight
   Component {
     id: entry
-    Loader {
+    Item {
+      id: slot
       required property string modelData
       width: root.vertical ? root.width : implicitWidth
       height: root.vertical ? implicitHeight : root.height
-      Component.onCompleted: setSource(Qt.resolvedUrl(modelData === "tray" ? "TrayModule.qml" : "BarModule.qml"), modelData === "tray" ? {} : {
-        moduleName: modelData
-      })
-      onLoaded: {
-        item.configuration = Qt.binding(() => root.configuration);
-        item.guide = Qt.binding(() => root.guide);
-        item.vertical = Qt.binding(() => root.vertical);
-        item.screen = Qt.binding(() => root.screen);
+      readonly property bool failed: moduleLoader.status === Loader.Error || Resilience.blocked("bar:" + modelData)
+      implicitWidth: failed ? Math.max(Theme.largeTargets ? 44 : 32, root.guide.iconSize + 12) : moduleLoader.implicitWidth
+      implicitHeight: failed ? Math.max(Theme.largeTargets ? 44 : 32, root.guide.iconSize + 12) : moduleLoader.implicitHeight
+      GuardedLoader {
+        id: moduleLoader
+        moduleId: "bar:" + slot.modelData
+        anchors.fill: parent
+        Component.onCompleted: setSource(Qt.resolvedUrl(slot.modelData === "tray" ? "TrayModule.qml" : "BarModule.qml"), slot.modelData === "tray" ? {} : {
+          moduleName: slot.modelData
+        })
+        onLoaded: {
+          item.configuration = Qt.binding(() => root.configuration);
+          item.guide = Qt.binding(() => root.guide);
+          item.vertical = Qt.binding(() => root.vertical);
+          item.screen = Qt.binding(() => root.screen);
+        }
+      }
+      ActionButton {
+        anchors.fill: parent
+        visible: slot.failed
+        icon: "error"
+        hint: "Reintentar módulo: " + slot.modelData
+        onClicked: Resilience.retry("bar:" + slot.modelData)
       }
     }
   }

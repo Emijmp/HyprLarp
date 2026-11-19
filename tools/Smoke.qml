@@ -9,8 +9,8 @@ Scope {
   property int step: 0
   readonly property var themeNames: Object.keys(Theme.palettes)
   readonly property int themeStart: panels.length + settings.sections.length + 7
-  readonly property int moduleStart: themeStart + themeNames.length
-  readonly property var panels: ["control", "launcher", "wifi", "bluetooth", "notifications", "clipboard", "media", "calendar", "session", "resources", "battery", "wallpapers", "capture", "audio", "brightness", "energy", "night-light", "usb"]
+  readonly property int moduleStart: themeStart + themeNames.length + 1
+  readonly property var panels: ["control", "launcher", "navigation", "wifi", "bluetooth", "notifications", "clipboard", "media", "calendar", "session", "resources", "performance", "battery", "wallpapers", "capture", "audio", "brightness", "energy", "night-light", "usb", "displays"]
   readonly property var geometryCases: [
     {
       barPosition: "top",
@@ -101,6 +101,18 @@ Scope {
     repeat: true
     running: true
     onTriggered: {
+      if (Quickshell.env("HYPRLARP_LAUNCHER_CHECKS_ONLY") === "1") {
+        stop();
+        launcherChecks.setSource(Qt.resolvedUrl("LauncherChecks.qml"));
+        return;
+      }
+      if (Quickshell.env("HYPRLARP_DISPLAY_CHECKS_ONLY") === "1") {
+        stop();
+        displayChecks.setSource(Qt.resolvedUrl("DisplayChecks.qml"), {
+          view: settings
+        });
+        return;
+      }
       if (Quickshell.env("HYPRLARP_SESSION_CHECKS_ONLY") === "1") {
         stop();
         sessionChecks.setSource(Qt.resolvedUrl("SessionChecks.qml"));
@@ -286,8 +298,27 @@ Scope {
           Bridge.set(key, values[key]);
         console.log("SMOKE bar geometry", root.step);
       } else if (root.step < root.moduleStart) {
-        Theme.apply(root.themeNames[root.step - root.themeStart]);
-        console.log("SMOKE theme", Bridge.settings.theme);
+        if (root.step < root.themeStart + root.themeNames.length) {
+          Theme.apply(root.themeNames[root.step - root.themeStart]);
+          console.log("SMOKE theme", Bridge.settings.theme);
+        } else {
+          Bridge.setMany({
+            themeScheduleEnabled: true,
+            themeDay: "paper",
+            themeNight: "amoled",
+            themeDayStart: "07:00",
+            themeNightStart: "19:00"
+          });
+          Theme.localMinute = 8 * 60;
+          if (Theme.scheduledTheme !== "paper")
+            throw new Error("Day theme schedule failed");
+          Theme.localMinute = 20 * 60;
+          if (Theme.scheduledTheme !== "amoled")
+            throw new Error("Night theme schedule failed");
+          Bridge.set("themeScheduleEnabled", false);
+          Theme.localMinute = Qt.binding(() => Clock.date.getHours() * 60 + Clock.date.getMinutes());
+          console.log("SMOKE contextual themes COMPLETE");
+        }
       } else if (root.step === root.moduleStart) {
         ShellState.close();
         Bridge.set("barModules", []);
@@ -404,19 +435,54 @@ Scope {
         console.log("SMOKE COMPLETE");
         Qt.quit();
       } else
-        settingsChecks.setSource(Qt.resolvedUrl("SettingsChecks.qml"), {
-          view: settings,
-          running: true
+        displayChecks.setSource(Qt.resolvedUrl("DisplayChecks.qml"), {
+          view: settings
         });
+    })
+  }
+  Loader {
+    id: displayChecks
+    onLoaded: item.completed.connect(() => {
+      if (Quickshell.env("HYPRLARP_DISPLAY_CHECKS_ONLY") === "1") {
+        console.log("SMOKE COMPLETE");
+        Qt.quit();
+        return;
+      }
+      settingsChecks.setSource(Qt.resolvedUrl("SettingsChecks.qml"), {
+        view: settings,
+        running: true
+      });
     })
   }
   Loader {
     id: settingsChecks
     onLoaded: {
       item.completed.connect(() => {
-        console.log("SMOKE COMPLETE");
-        Qt.quit();
+        launcherChecks.setSource(Qt.resolvedUrl("LauncherChecks.qml"));
       });
     }
+  }
+  Loader {
+    id: launcherChecks
+    onLoaded: {
+      item.completed.connect(() => {
+        dailyChecks.setSource(Qt.resolvedUrl("DailyChecks.qml"), {
+          view: settings
+        });
+      });
+    }
+  }
+  Loader {
+    id: dailyChecks
+    onLoaded: item.completed.connect(() => {
+      accessibilityChecks.setSource(Qt.resolvedUrl("AccessibilityChecks.qml"));
+    })
+  }
+  Loader {
+    id: accessibilityChecks
+    onLoaded: item.completed.connect(() => {
+      console.log("SMOKE COMPLETE");
+      Qt.quit();
+    })
   }
 }

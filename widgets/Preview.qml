@@ -21,7 +21,7 @@ Item {
     anchors.leftMargin: BarLayout.position === "left" ? BarLayout.size + BarLayout.margins.left + 8 : 16
     anchors.bottomMargin: BarLayout.position === "bottom" ? BarLayout.size + BarLayout.margins.bottom + 8 : 16
     text: "HyprLarp · Vista previa · Controles del sistema desactivados"
-    font.pixelSize: 10
+    font.pixelSize: Theme.fontPx(10)
     color: Theme.muted
   }
   PanelOverlay {

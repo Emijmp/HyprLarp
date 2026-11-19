@@ -8,6 +8,22 @@ Singleton {
   id: root
   readonly property bool enabled: !Bridge.preview && !Bridge.settingsOnly && !!Quickshell.env("HYPRLAND_INSTANCE_SIGNATURE")
   readonly property string focusedScreenName: enabled && Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : ""
+  Connections {
+    target: Hyprland
+    enabled: root.enabled
+    function onRawEvent(event) {
+      if (["monitoradded", "monitoraddedv2", "monitorremoved", "monitorremovedv2", "configreloaded"].includes(event.name)) {
+        displayEvents.reason = event.name === "configreloaded" ? "configreloaded" : "event";
+        displayEvents.restart();
+      }
+    }
+  }
+  Timer {
+    id: displayEvents
+    property string reason: "event"
+    interval: 350
+    onTriggered: Bridge.send("displays-event", {reason: reason})
+  }
   readonly property var snapshot: enabled ? ({
       monitors: Hyprland.monitors.values.map(m => ({
             name: m.name,

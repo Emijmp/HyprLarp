@@ -17,7 +17,7 @@ Item {
   activeFocusOnTab: moduleName !== "workspaces"
   Keys.onReturnPressed: ModuleCatalog.activate(moduleName, screen)
   Keys.onSpacePressed: ModuleCatalog.activate(moduleName, screen)
-  Accessible.name: ModuleCatalog.labels[moduleName] || moduleName
+  Accessible.name: (moduleName === "launcher" ? "HyprLarp · " : "") + (ModuleCatalog.labels[moduleName] || moduleName) + (caption && moduleName !== "launcher" ? " · " + caption : "")
   Accessible.description: definition.description || ""
   Accessible.role: Accessible.Button
   Accessible.onPressAction: ModuleCatalog.activate(moduleName, screen)
@@ -26,14 +26,14 @@ Item {
   readonly property int paddingY: (configuration.modulePaddingY ?? 2) + borderSize
   readonly property string caption: {
     if (moduleName === "clock")
-      return Qt.formatDateTime(Clock.date, "hh:mm");
+      return Clock.timeText;
     if (configuration.barShowLabels === false)
       return "";
     switch (moduleName) {
     case "launcher":
-      return "hyprlarp";
+      return "HyprLarp";
     case "calendar":
-      return Qt.formatDateTime(Clock.date, "dd/MM");
+      return Clock.dateText;
     case "brightness":
       return Bridge.system.brightnessAvailable ? Math.round(Bridge.system.brightness) + "%" : "—";
     case "energy":
@@ -61,12 +61,13 @@ Item {
     }
   }
   readonly property var workspaceEntries: moduleName === "workspaces" ? Compositor.entriesFor(screen, configuration.barWorkspaceCount ?? 5, configuration.barWorkspaceDisplay || "current") : []
-  readonly property int workspaceCell: Math.max(20, guide.fontSize + 4)
+  readonly property int workspaceCell: Math.max(Theme.largeTargets ? 44 : 20, guide.fontSize + 4)
   readonly property real workspaceWidth: workspaceEntries.reduce((total, workspace) => total + cellWidth(workspace), 0) + Math.max(0, workspaceEntries.length - 1) * 4
   readonly property real naturalWidth: (moduleName === "clock" ? 0 : guide.iconSize) + (caption !== "" ? Math.ceil(captionMetrics.advanceWidth) + 2 + (moduleName === "clock" ? 0 : 6) : 0) + (moduleName === "notifications" && Notices.unread > 0 ? Math.ceil(badgeMetrics.advanceWidth) + 8 : 0)
   opacity: Theme.opacityFor(moduleName, configuration)
-  implicitWidth: 2 * paddingX + (vertical ? Math.max(guide.iconSize, workspaceCell) : moduleName === "workspaces" ? workspaceWidth : Math.min(moduleName === "media" ? 200 : 400, naturalWidth))
-  implicitHeight: 2 * paddingY + (vertical && moduleName === "workspaces" ? workspaceEntries.length * workspaceCell + Math.max(0, workspaceEntries.length - 1) * 5 : vertical && moduleName === "clock" ? 2 * (guide.fontSize + 4) : Math.max(guide.iconSize, guide.fontSize + 4))
+  implicitWidth: Math.max(Theme.largeTargets ? 44 : 0, 2 * paddingX + (vertical ? Math.max(guide.iconSize, workspaceCell) : moduleName === "workspaces" ? workspaceWidth : Math.min(moduleName === "media" ? 200 : 400, naturalWidth)))
+  readonly property string verticalClock: Clock.timeText.replace(/[: ]/g, "\n")
+  implicitHeight: 2 * paddingY + (vertical && moduleName === "workspaces" ? workspaceEntries.length * workspaceCell + Math.max(0, workspaceEntries.length - 1) * 5 : vertical && moduleName === "clock" ? verticalClock.split("\n").length * (guide.fontSize + 4) : Math.max(guide.iconSize, guide.fontSize + 4))
   function cellWidth(workspace) {
     return Math.max(workspaceCell, Math.ceil(Math.min(workspace.label.length, 12) * guide.fontSize * 0.65) + 8);
   }
@@ -126,7 +127,7 @@ Item {
   Label {
     visible: root.vertical && root.moduleName === "clock"
     anchors.centerIn: body
-    text: Qt.formatDateTime(Clock.date, "hh") + "\n" + Qt.formatDateTime(Clock.date, "mm")
+    text: root.verticalClock
     font.family: Theme.mono
     font.pixelSize: guide.fontSize
     horizontalAlignment: Text.AlignHCenter
@@ -166,7 +167,7 @@ Item {
   }
   Hint {
     visible: hover.containsMouse
-    text: (ModuleCatalog.labels[root.moduleName] || root.moduleName) + " · " + (root.definition.description || "") + (!root.available ? " · No disponible" : "")
+    text: (root.moduleName === "launcher" ? "HyprLarp · " : "") + (ModuleCatalog.labels[root.moduleName] || root.moduleName) + " · " + (root.definition.description || "") + (!root.available ? " · No disponible" : "")
   }
   Timer {
     id: brightnessWheel
@@ -187,6 +188,9 @@ Item {
       width: root.vertical ? Math.max(0, body.width - 2 * root.paddingX) : root.cellWidth(modelData)
       height: root.workspaceCell
     }
+  }
+  FocusRing {
+    control: root
   }
 
   Row {

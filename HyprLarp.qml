@@ -12,6 +12,25 @@ ShellRoot {
   property bool nativeConnectionsReady: Connectivity.active
   property bool systemEffectsReady: Osd.visible || NightLight.desired
   property bool quitAfterSaving: false
+  property string syncedContextTheme: ""
+  function syncContextTheme() {
+    if (!Bridge.ready || !Bridge.connected || Bridge.preview || Bridge.settingsOnly || Bridge.saving || Bridge.hasPendingSettings || Bridge.awaitingInitial)
+      return;
+    if (!Bridge.settings.themeScheduleEnabled) {
+      syncedContextTheme = "";
+      return;
+    }
+    if (syncedContextTheme === Theme.scheduledTheme)
+      return;
+    syncedContextTheme = Theme.scheduledTheme;
+    Bridge.send("theme-context-changed");
+  }
+  Connections {
+    target: Theme
+    function onScheduledThemeChanged() {
+      Qt.callLater(root.syncContextTheme);
+    }
+  }
   function finishStandaloneSettings() {
     if (quitAfterSaving && (!Bridge.connected || (!Bridge.saving && !Bridge.queuedSettingsOperation && !Bridge.hasPendingSettings)))
       Qt.quit();
@@ -20,13 +39,37 @@ ShellRoot {
     target: Bridge
     function onSettingsSettled() {
       root.finishStandaloneSettings();
+      root.syncContextTheme();
     }
     function onConnectedChanged() {
       root.finishStandaloneSettings();
+      if (!Bridge.connected)
+        root.syncedContextTheme = "";
+      Qt.callLater(root.syncContextTheme);
+    }
+    function onReadyChanged() {
+      Qt.callLater(root.syncContextTheme);
     }
   }
   IpcHandler {
     target: "shell"
+    function health(): string {
+      return JSON.stringify({
+        ready: Bridge.ready,
+        connected: Bridge.connected,
+        backendPid: Bridge.backendPid,
+        panel: ShellState.panel,
+        blockedModules: Bridge.faults.filter(item => item.blocked).map(item => item.id),
+        appearance: {
+          theme: Theme.scheduledTheme,
+          accent: String(Theme.accent),
+          panelLayout: Bridge.settings.panelLayout || "floating",
+          panelStyle: Bridge.settings.panelStyle || "standard",
+          blurEnabled: Theme.blurEnabled,
+          performanceMode: Bridge.settings.performanceMode || "balanced"
+        }
+      });
+    }
     function toggle(name: string): void {
       ShellState.toggle(name);
     }
@@ -38,6 +81,9 @@ ShellRoot {
     }
     function capture(mode: string): void {
       ShellState.capture(mode);
+    }
+    function captureFrozen(mode: string): void {
+      ShellState.capture(mode, 0, false, true);
     }
     function lock(): void {
       Bridge.perform("session", {
@@ -116,6 +162,23 @@ ShellRoot {
           width: 1,
           height: 1
         }
+      }
+    }
+  }
+  LazyLoader {
+    active: Bridge.ready && Bridge.settingsOnly && ShellState.panel === "performance"
+    component: FloatingWindow {
+      title: "HyprLarp · Rendimiento"
+      implicitWidth: 560
+      implicitHeight: 760
+      minimumSize: Qt.size(420, 420)
+      color: Theme.surface
+      onVisibleChanged: if (!visible)
+        ShellState.close()
+      PanelSurface {
+        anchors.fill: parent
+        panel: "performance"
+        availableHeight: parent.height
       }
     }
   }

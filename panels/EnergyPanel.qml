@@ -14,9 +14,10 @@ ColumnLayout {
     text: "Perfil del sistema"
   }
   Label {
+    visible: Bridge.power.available
     text: Bridge.power.available ? parent.labels[Bridge.power.profile] || Bridge.power.profile : "Servicio de energía no disponible"
     Layout.fillWidth: true
-    font.pixelSize: 13
+    font.pixelSize: Theme.fontPx(13)
   }
   Repeater {
     model: Bridge.power.profiles || []
@@ -34,13 +35,11 @@ ColumnLayout {
       })
     }
   }
-  Label {
+  EmptyState {
     visible: !Bridge.power.available
-    text: Bridge.power.error || "Requiere power-profiles-daemon y acceso a D-Bus."
-    color: Theme.muted
-    font.pixelSize: 11
-    Layout.fillWidth: true
-    wrapMode: Text.WordWrap
+    error: true
+    title: "Servicio de energía no disponible"
+    description: Bridge.power.error || "Requiere power-profiles-daemon y acceso a D-Bus."
   }
   Label {
     visible: !!Bridge.power.reason
@@ -49,7 +48,7 @@ ColumnLayout {
           "high-operating-temperature": "temperatura elevada"
         })[Bridge.power.reason] || Bridge.power.reason)
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
   }

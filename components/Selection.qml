@@ -11,15 +11,20 @@ ComboBox {
   signal edited(string value)
   model: choices
   currentIndex: Math.max(0, choices.indexOf(value))
-  implicitHeight: 34
+  implicitHeight: Theme.controlHeight(34)
+  Accessible.name: objectName || "Seleccionar opción"
   implicitWidth: 250
   font.family: Theme.font
-  font.pixelSize: 12
+  font.pixelSize: Theme.fontPx(12)
   onActivated: index => edited(choices[index])
   contentItem: Label {
     leftPadding: 9
     rightPadding: 24
     text: root.labels[root.currentIndex] || root.choices[root.currentIndex] || ""
+    color: root.enabled ? Theme.text : Theme.muted
+    font.family: root.font.family
+    font.pixelSize: root.font.pixelSize
+    textFormat: Text.PlainText
     elide: Text.ElideRight
     verticalAlignment: Text.AlignVCenter
   }
@@ -39,10 +44,14 @@ ComboBox {
     required property int index
     required property string modelData
     width: root.width
-    height: 34
+    height: Theme.controlHeight(34)
     highlighted: root.highlightedIndex === index
     contentItem: Label {
       text: root.labels[index] || modelData
+      color: Theme.text
+      font.family: root.font.family
+      font.pixelSize: root.font.pixelSize
+      textFormat: Text.PlainText
       elide: Text.ElideRight
       verticalAlignment: Text.AlignVCenter
     }
@@ -67,5 +76,8 @@ ComboBox {
       border.color: Theme.border
       border.width: 1
     }
+  }
+  FocusRing {
+    control: root
   }
 }

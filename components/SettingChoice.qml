@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../core"
 
 ColumnLayout {
   id: root
@@ -13,7 +14,8 @@ ColumnLayout {
   SectionTitle {
     text: root.title
   }
-  RowLayout {
+  Flow {
+    Layout.fillWidth: true
     spacing: 4
     Repeater {
       model: root.choices
@@ -24,9 +26,6 @@ ColumnLayout {
         selected: root.value === modelData
         onClicked: root.edited(modelData)
       }
-    }
-    Item {
-      Layout.fillWidth: true
     }
   }
 }

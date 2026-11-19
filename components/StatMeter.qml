@@ -15,12 +15,12 @@ ColumnLayout {
     Label {
       text: root.title
       Layout.fillWidth: true
-      font.pixelSize: 12
+      font.pixelSize: Theme.fontPx(12)
     }
     Label {
       text: root.detail || Math.round(root.value) + "%"
       font.family: Theme.mono
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       color: Theme.muted
     }
   }

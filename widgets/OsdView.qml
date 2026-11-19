@@ -4,8 +4,12 @@ import "../core"
 import "../components"
 
 Rectangle {
-  implicitWidth: 280
-  implicitHeight: 66
+  implicitWidth: Theme.px(280)
+  implicitHeight: Theme.controlHeight(66)
+  Accessible.role: Accessible.StatusBar
+  Accessible.name: Osd.title + " · " + (Osd.muted ? "Silenciado" : Math.round(Osd.value * 100) + "%")
+  onVisibleChanged: if (visible)
+    Accessible.announce(Accessible.name, Accessible.Polite)
   visible: Osd.visible
   color: Theme.surface
   radius: Theme.radiusFor("panel")
@@ -23,12 +27,12 @@ Rectangle {
       }
       Label {
         text: Osd.title + (Osd.demo ? " · Prueba" : "")
-        font.pixelSize: 12
+        font.pixelSize: Theme.fontPx(12)
         Layout.fillWidth: true
       }
       Label {
         text: Osd.muted ? "Silenciado" : Math.round(Osd.value * 100) + "%"
-        font.pixelSize: 11
+        font.pixelSize: Theme.fontPx(11)
         font.family: Theme.mono
       }
     }

@@ -9,6 +9,8 @@ Singleton {
   readonly property bool settingsOnly: Quickshell.env("HYPRLARP_SETTINGS_ONLY") === "1"
   readonly property int backendPid: Number(service.processId) || 0
   property bool ready: false
+  onReadyChanged: if (ready && Quickshell.env("HYPRLARP_BENCHMARK") === "1")
+    console.log("BENCHMARK_READY " + Date.now())
   property bool connected: false
   property string settingsOperation: ""
   property string queuedSettingsOperation: ""
@@ -22,6 +24,12 @@ Singleton {
   property var launcher: ({
       favorites: [],
       recent: []
+    })
+  property var launcherResults: ({
+      token: "",
+      results: [],
+      truncated: false,
+      error: ""
     })
   property var captureDraft: null
   property var shortcutConflicts: []
@@ -47,6 +55,23 @@ Singleton {
   property var settingsHistory: ({
       undo: 0,
       redo: 0
+    })
+  property var settingsRevisions: []
+  property var revisionDiff: ({
+      id: "",
+      changes: []
+    })
+  property var diagnostics: ({
+      checks: [],
+      versions: {}
+    })
+  property var performance: ({
+      current: null,
+      samples: [],
+      history: [],
+      recording: null,
+      paused: false,
+      panelLoads: []
     })
   readonly property bool canUndo: configurationActive && ready && connected && !restoring && (settingsHistory.undo > 0 || hasConfigurationEdits)
   readonly property bool canRedo: configurationActive && ready && connected && !restoring && !saving && !hasPendingSettings && settingsHistory.redo > 0
@@ -84,6 +109,11 @@ Singleton {
   property var clipboard: []
   property var clipboardThumbnails: ({})
   property var wallpapers: []
+  property var wallpaperPalette: ({
+      path: "",
+      name: "",
+      colors: []
+    })
   readonly property bool externalWallpaper: settings.wallpaperProvider === "external"
   property var wallpaperTools: ({
       waypaper: false,
@@ -95,6 +125,13 @@ Singleton {
       applied: false,
       error: ""
     })
+  property var displays: ({
+      available: false,
+      outputs: [],
+      pending: null,
+      error: "",
+      notice: ""
+    })
   property var wallpaperState: ({
       directory: "",
       browseUrl: "",
@@ -104,6 +141,8 @@ Singleton {
     })
   property var bluetoothPrompt: null
   property var history: []
+  property var batteryAlerts: []
+  property var faults: []
   property var pending: ({})
   property string message: ""
   property bool messageIsError: false
@@ -322,6 +361,9 @@ Singleton {
       case "launcher":
         launcher = event.data;
         break;
+      case "launcher-results":
+        launcherResults = event.data;
+        break;
       case "capture-edit":
         captureDraft = event.data;
         break;
@@ -343,6 +385,7 @@ Singleton {
         settingsOperation = "";
         ready = true;
         if (initial) {
+          send("performance-ready");
           send("settings-context", {
             focused: configurationActive
           });
@@ -363,6 +406,18 @@ Singleton {
         break;
       case "settings-history":
         settingsHistory = event.data;
+        break;
+      case "settings-revisions":
+        settingsRevisions = event.data;
+        break;
+      case "settings-revision-diff":
+        revisionDiff = event.data;
+        break;
+      case "diagnostics":
+        diagnostics = event.data;
+        break;
+      case "performance":
+        performance = event.data;
         break;
       case "settings-rejected":
         afterSaving = [];
@@ -388,21 +443,40 @@ Singleton {
         bluetooth = event.data;
         break;
       case "clipboard-thumbnail":
-        clipboardThumbnails = Object.assign({}, clipboardThumbnails, {
-          [event.data.id]: event.data.url
-        });
+        {
+          const next = Object.assign({}, clipboardThumbnails);
+          delete next[event.data.id];
+          next[event.data.id] = event.data.url;
+          for (const key of Object.keys(next).slice(0, -16))
+            delete next[key];
+          clipboardThumbnails = next;
+        }
         break;
       case "clipboard":
         clipboard = event.data;
+        {
+          const present = new Set(clipboard.map(entry => String(entry.id)));
+          const kept = {};
+          for (const key of Object.keys(clipboardThumbnails))
+            if (present.has(key))
+              kept[key] = clipboardThumbnails[key];
+          clipboardThumbnails = kept;
+        }
         break;
       case "wallpapers":
         wallpapers = event.data;
+        break;
+      case "wallpaper-palette":
+        wallpaperPalette = event.data;
         break;
       case "wallpaper-tools":
         wallpaperTools = event.data;
         break;
       case "window-gaps":
         windowGapsState = event.data;
+        break;
+      case "displays":
+        displays = event.data;
         break;
       case "wallpaper-state":
         wallpaperState = event.data;
@@ -416,6 +490,12 @@ Singleton {
       case "history":
         history = event.data;
         historyLoaded(event.data);
+        break;
+      case "battery-alert":
+        batteryAlerts = batteryAlerts.concat([event.data]).slice(-8);
+        break;
+      case "faults":
+        faults = event.data;
         break;
       case "error":
         toast(event.data, true);
@@ -501,6 +581,8 @@ Singleton {
         root.toast("Servicio desconectado. Reconectando…", true);
       } else {
         root.toast("El servicio no pudo reiniciarse después de tres intentos. Revisa el registro.", true);
+        if (!root.preview && !root.settingsOnly)
+          Resilience.recover();
       }
     }
     stdout: SplitParser {

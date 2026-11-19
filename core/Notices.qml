@@ -13,6 +13,37 @@ Singleton {
   property var liveHandlers: ({})
   property var liveOrder: []
   property int sequence: 0
+  function batteryWarnings() {
+    const pending = Bridge.batteryAlerts;
+    if (!pending.length)
+      return;
+    Bridge.batteryAlerts = [];
+    if (Bridge.preview || Bridge.settingsOnly)
+      return;
+    for (const alert of pending) {
+      const now = Date.now();
+      const item = {
+        id: -1, token: "battery:" + now + ":" + (++sequence), app: "HyprLarp", appId: "hyprlarp-battery",
+        summary: alert.level === "critical" ? "Batería crítica" : "Batería baja",
+        body: "Queda " + alert.percent + "% de batería. Conecta el cargador.", icon: "", time: now,
+        urgency: alert.level === "critical" ? 2 : 1, read: false, timeout: now + 10000
+      };
+      const rule = (Bridge.settings.notificationRules || {})[item.appId] || {};
+      if (rule.history !== false) {
+        history = [item].concat(history).slice(0, Bridge.settings.notificationHistoryLimit ?? 100);
+        persist();
+      }
+      if (rule.popup !== false && !Presentation.active && (!Bridge.settings.doNotDisturb || alert.level === "critical")) {
+        popups = popups.concat([item]).slice(-3);
+        deadlines = Object.assign({}, deadlines, {[item.token]: item.timeout});
+      }
+    }
+  }
+  Component.onCompleted: batteryWarnings()
+  Connections {
+    target: Bridge
+    function onBatteryAlertsChanged() { root.batteryWarnings(); }
+  }
   readonly property int unread: history.filter(n => !n.read).length
   function persist() {
     if (!persistTimer.running)
@@ -163,6 +194,13 @@ Singleton {
     return daemon.item ? daemon.item.trackedNotifications.values.find(n => n.id === id) : null;
   }
   function dismiss(id, token) {
+    if (id === -1) {
+      const times = Object.assign({}, deadlines);
+      delete times[token];
+      deadlines = times;
+      popups = popups.filter(item => item.token !== token);
+      return;
+    }
     const notification = live(id, token);
     if (notification)
       notification.dismiss();
@@ -210,6 +248,10 @@ Singleton {
     onTriggered: {
       const expired = Object.keys(root.deadlines).filter(id => root.deadlines[id] > 0 && root.deadlines[id] <= Date.now());
       for (const id of expired) {
+        if (id.startsWith("battery:")) {
+          root.dismiss(-1, id);
+          continue;
+        }
         const notification = root.live(Number(id));
         if (notification)
           notification.expire();

@@ -33,7 +33,7 @@ ColumnLayout {
   Label {
     visible: !Bridge.system.brightnessAvailable
     text: "El equipo no expone un dispositivo de brillo compatible."
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     color: Theme.muted
     wrapMode: Text.WordWrap
     Layout.fillWidth: true

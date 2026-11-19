@@ -4,7 +4,7 @@ import "../core"
 Text {
   color: Theme.text
   font.family: Theme.font
-  font.pixelSize: 12
+  font.pixelSize: Theme.fontPx(12)
   renderType: Text.NativeRendering
   textFormat: Text.PlainText
   elide: Text.ElideRight

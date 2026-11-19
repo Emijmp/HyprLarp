@@ -45,7 +45,7 @@ ColumnLayout {
       text: "El fondo queda libre para Waypaper u otro gestor. La barra y los paneles siguen por encima. Para vídeos, elige mpvpaper en Waypaper."
       Layout.fillWidth: true
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       wrapMode: Text.WordWrap
     }
     RowLayout {
@@ -76,14 +76,14 @@ ColumnLayout {
       text: !Bridge.wallpaperTools.waypaper ? "Instala Waypaper para abrir el selector externo." : !Bridge.wallpaperTools.mpvpaper ? "Instala mpvpaper para reproducir fondos de vídeo." : "Falta socat para cambiar, pausar o silenciar vídeos desde Waypaper."
       Layout.fillWidth: true
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       wrapMode: Text.WordWrap
     }
     Label {
       text: "Waypaper conserva sus ajustes y administra el reproductor. Al volver a HyprLarp se recupera tu imagen anterior; para detener un vídeo, gestiónalo desde Waypaper."
       Layout.fillWidth: true
       color: Theme.muted
-      font.pixelSize: 10
+      font.pixelSize: Theme.fontPx(10)
       wrapMode: Text.WordWrap
     }
   }
@@ -123,12 +123,10 @@ ColumnLayout {
         })
       }
     }
-    Label {
+    StatusMessage {
       text: root.directoryError || Bridge.wallpaperState.error || (Bridge.wallpaperState.directory ? "Buscando en " + Bridge.wallpaperState.directory : "Elige una carpeta o escribe su ruta.")
-      Layout.fillWidth: true
-      font.pixelSize: 10
-      color: Theme.muted
-      wrapMode: Text.WrapAnywhere
+      error: !!root.directoryError || !!Bridge.wallpaperState.error
+      fontSize: 10
     }
     FolderDialog {
       id: folderDialog
@@ -156,6 +154,17 @@ ColumnLayout {
       ScrollBar.vertical: SlimScrollBar {}
       delegate: Item {
         id: option
+        activeFocusOnTab: thumbnail.status === Image.Ready
+        Keys.onReturnPressed: root.edit("wallpaper", option.modelData.path)
+        Keys.onSpacePressed: root.edit("wallpaper", option.modelData.path)
+        Accessible.role: Accessible.Button
+        Accessible.name: "Usar fondo · " + modelData.name
+        Accessible.selected: Bridge.settings.wallpaper === modelData.path
+        Accessible.onPressAction: if (thumbnail.status === Image.Ready)
+          root.edit("wallpaper", modelData.path)
+        FocusRing {
+          control: option
+        }
         required property var modelData
         required property int index
         width: grid.cellWidth
@@ -185,7 +194,7 @@ ColumnLayout {
               visible: thumbnail.status === Image.Error
               anchors.centerIn: parent
               text: "Imagen no disponible"
-              font.pixelSize: 10
+              font.pixelSize: Theme.fontPx(10)
               color: Theme.muted
             }
             MouseArea {
@@ -197,7 +206,7 @@ ColumnLayout {
           }
           Label {
             text: option.modelData.name
-            font.pixelSize: 11
+            font.pixelSize: Theme.fontPx(11)
             Layout.fillWidth: true
             elide: Text.ElideRight
           }
@@ -206,12 +215,13 @@ ColumnLayout {
     }
     EmptyState {
       visible: root.imageCount === 0
-      title: "Sin imágenes"
-      description: "Elige una carpeta con imágenes PNG, JPG, WEBP, SVG o BMP."
+      error: !!root.directoryError || !!Bridge.wallpaperState.error
+      title: error ? "No se pudieron cargar los fondos" : "Sin imágenes"
+      description: root.directoryError || Bridge.wallpaperState.error || "Elige una carpeta con imágenes PNG, JPG, WEBP, SVG o BMP."
     }
     Label {
       text: root.imageCount + " imágenes" + (Bridge.wallpaperState.truncated ? " · Se muestran las primeras 200" : "")
-      font.pixelSize: 10
+      font.pixelSize: Theme.fontPx(10)
       color: Theme.muted
     }
   }

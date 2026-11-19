@@ -58,7 +58,7 @@ ColumnLayout {
     text: "Ajusta las ventanas en mosaico. La distancia a los bordes se suma al espacio reservado de la barra. Mover un control activa la personalización."
     Layout.fillWidth: true
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     wrapMode: Text.WordWrap
   }
   SettingSlider {
@@ -98,13 +98,10 @@ ColumnLayout {
     value: Bridge.settings.windowGapsIn ?? 4
     onEdited: value => root.setInner(value)
   }
-  Label {
+  StatusMessage {
     visible: !Bridge.preview && !!Bridge.windowGapsState.error
     text: Bridge.windowGapsState.error || ""
-    Layout.fillWidth: true
-    color: Theme.muted
-    font.pixelSize: 11
-    wrapMode: Text.WordWrap
+    error: true
   }
   ActionButton {
     text: "Reintentar aplicación"

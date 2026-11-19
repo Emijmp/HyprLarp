@@ -34,7 +34,7 @@ ColumnLayout {
     Label {
       text: "Arrastra el tirador para ordenar o usa las flechas. El centro conserva su posición mientras haya espacio."
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       wrapMode: Text.WordWrap
       Layout.fillWidth: true
     }
@@ -98,7 +98,7 @@ ColumnLayout {
               Label {
                 text: ModuleCatalog.labels[entry.modelData]
                 Layout.fillWidth: true
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontPx(12)
               }
               ActionButton {
                 icon: "up"
@@ -121,7 +121,7 @@ ColumnLayout {
               Label {
                 text: "Zona"
                 color: Theme.muted
-                font.pixelSize: 10
+                font.pixelSize: Theme.fontPx(10)
               }
               Repeater {
                 model: ["start", "center", "end"]
@@ -177,7 +177,7 @@ ColumnLayout {
             anchors.fill: parent
             text: parent.containsDrag ? "Soltar aquí" : ModuleCatalog.zones[zoneEntry.modelData].length === 0 ? "Zona vacía · suelta un módulo aquí" : "Soltar al final"
             color: parent.containsDrag ? Theme.text : Theme.muted
-            font.pixelSize: 10
+            font.pixelSize: Theme.fontPx(10)
           }
         }
       }
@@ -226,12 +226,12 @@ ColumnLayout {
           spacing: 2
           Label {
             text: ModuleCatalog.labels[availableEntry.modelData]
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontPx(12)
             Layout.fillWidth: true
           }
           Label {
             text: ModuleCatalog.byId[availableEntry.modelData].description
-            font.pixelSize: 10
+            font.pixelSize: Theme.fontPx(10)
             color: Theme.muted
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
@@ -247,7 +247,7 @@ ColumnLayout {
       visible: ModuleCatalog.search(moduleSearch.text, root.category).length === 0
       text: "No hay módulos disponibles con ese filtro."
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
   }
   ColumnLayout {

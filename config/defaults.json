@@ -1,6 +1,11 @@
 {
   "version": 3,
   "theme": "amoled",
+  "themeScheduleEnabled": false,
+  "themeDay": "paper",
+  "themeNight": "amoled",
+  "themeDayStart": "07:00",
+  "themeNightStart": "19:00",
   "accent": "#ffffff",
   "customPalette": {
     "name": "Mi tema",
@@ -45,8 +50,13 @@
   "modulePaddingY": 2,
   "moduleRadius": 2,
   "panelOpacity": 1,
+  "panelLayout": "floating",
+  "panelStyle": "standard",
+  "panelBlur": false,
+  "greeterLayout": "sidebar",
   "radius": 0,
   "animations": false,
+  "performanceMode": "balanced",
   "windowGapsEnabled": false,
   "windowGapsIn": 4,
   "windowGapsOut": {
@@ -92,6 +102,7 @@
     "battery": "SUPER CTRL, P",
     "capture": "SUPER CTRL, S",
     "screenshot-region": ", Print",
+    "screenshot-region-frozen": "CTRL, Print",
     "screenshot-screen": "SHIFT, Print",
     "lock": "SUPER, L",
     "audio": "SUPER CTRL, A",
@@ -99,6 +110,7 @@
     "energy": "SUPER CTRL, E",
     "night-light": "SUPER CTRL, L",
     "usb": "SUPER CTRL, U",
+    "displays": "SUPER SHIFT, P",
     "osd": "SUPER CTRL, O"
   },
   "customBindings": [],
@@ -143,5 +155,20 @@
   "nightLightTemperature": 4000,
   "nightLightSchedule": false,
   "nightLightStart": "20:00",
-  "nightLightEnd": "07:00"
+  "nightLightEnd": "07:00",
+  "clockFormat": "24h",
+  "clockSeconds": false,
+  "clockDateFormat": "dd/MM/yyyy",
+  "calendarFirstDay": "monday",
+  "calendarWeekNumbers": false,
+  "batteryAlertsEnabled": true,
+  "batteryAlertLevels": {
+    "low": 20,
+    "critical": 10
+  },
+  "accessibilityTextScale": 1,
+  "accessibilityMinimumFontSize": 12,
+  "accessibilityHighContrast": false,
+  "accessibilityReducedMotion": false,
+  "accessibilityLargeTargets": false
 }

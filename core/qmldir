@@ -16,3 +16,4 @@ singleton Presentation 1.0 Presentation.qml
 BarGeometry 1.0 BarGeometry.qml
 singleton Osd 1.0 Osd.qml
 singleton NightLight 1.0 NightLight.qml
+singleton Resilience 1.0 Resilience.qml

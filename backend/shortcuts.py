@@ -85,7 +85,7 @@ def validate_combined(settings):
 
 def invocation(action, executable):
   arguments = [str(executable)]
-  arguments += [action] if action in {"settings", "lock", "screenshot-region", "screenshot-screen"} else ["toggle", action]
+  arguments += [action] if action in {"settings", "lock", "screenshot-region", "screenshot-region-frozen", "screenshot-window", "screenshot-screen"} else ["toggle", action]
   return shlex.join(arguments)
 
 

@@ -45,7 +45,7 @@ ColumnLayout {
     visible: Bridge.preview
     text: "Vista previa · las conexiones están desactivadas."
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
   }
@@ -53,7 +53,7 @@ ColumnLayout {
     Label {
       text: Bridge.network.ethernet ? "Ethernet conectado" : "Redes disponibles"
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       Layout.fillWidth: true
     }
     ActionButton {
@@ -75,7 +75,7 @@ ColumnLayout {
     Label {
       text: root.selectedNetwork ? "Adaptador: " + root.selectedNetwork.interface : ""
       color: Theme.muted
-      font.pixelSize: 10
+      font.pixelSize: Theme.fontPx(10)
     }
     Field {
       id: password
@@ -104,13 +104,10 @@ ColumnLayout {
     }
     Rule {}
   }
-  Label {
+  StatusMessage {
     visible: !!root.connectionError || !!Bridge.network.error
     text: root.connectionError || Bridge.network.error || ""
-    color: Theme.text
-    Layout.fillWidth: true
-    wrapMode: Text.WordWrap
-    font.pixelSize: 11
+    error: true
   }
   Repeater {
     model: Bridge.network.networks || []
@@ -126,12 +123,12 @@ ColumnLayout {
           Label {
             text: row.modelData.ssid
             Layout.fillWidth: true
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontPx(12)
             elide: Text.ElideRight
           }
           Label {
             text: (row.modelData.connected ? "Conectada" : row.modelData.signal + "% · " + (row.modelData.security && row.modelData.security !== "--" ? row.modelData.security : "Abierta")) + (root.multipleAdapters ? " · " + row.modelData.interface : "")
-            font.pixelSize: 10
+            font.pixelSize: Theme.fontPx(10)
             color: Theme.muted
           }
         }
@@ -168,6 +165,7 @@ ColumnLayout {
   }
   EmptyState {
     visible: (Bridge.network.networks || []).length === 0
+    error: !Bridge.network.available || !!Bridge.network.error
     title: !Bridge.network.available ? "NetworkManager no disponible" : Bridge.network.enabled ? "Sin redes disponibles" : "Wi-Fi desactivado"
     description: Bridge.network.available ? "Activa el adaptador y pulsa Buscar." : "Comprueba que NetworkManager esté iniciado."
   }

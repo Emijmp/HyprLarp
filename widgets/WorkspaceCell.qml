@@ -8,8 +8,8 @@ Item {
   property var screen: null
   property int fontSize: 12
   property int workspaceCount: 5
-  implicitWidth: Math.max(20, Math.ceil(Math.min(entry.label.length, 12) * fontSize * 0.65) + 8)
-  implicitHeight: Math.max(20, fontSize + 4)
+  implicitWidth: Math.max(Theme.largeTargets ? 44 : 20, Math.ceil(Math.min(entry.label.length, 12) * fontSize * 0.65) + 8)
+  implicitHeight: Math.max(Theme.largeTargets ? 44 : 20, fontSize + 4)
   activeFocusOnTab: true
   function activate() {
     Compositor.activate(entry, screen);
@@ -60,5 +60,9 @@ Item {
   }
   Accessible.name: entry.gap ? "Espacios ocultos: " + entry.name : "Espacio " + entry.name
   Accessible.role: Accessible.Button
+  Accessible.selected: entry.active
   Accessible.onPressAction: activate()
+  FocusRing {
+    control: root
+  }
 }

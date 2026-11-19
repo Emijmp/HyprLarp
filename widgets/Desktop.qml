@@ -5,6 +5,31 @@ import "../core"
 import "../components"
 
 Scope {
+  Variants {
+    model: Bridge.displays.pending ? Quickshell.screens : []
+    PanelWindow {
+      required property var modelData
+      screen: modelData
+      visible: true
+      color: "transparent"
+      anchors {
+        top: true
+        left: true
+        right: true
+      }
+      margins.top: 18
+      implicitHeight: confirmation.implicitHeight
+      exclusionMode: ExclusionMode.Ignore
+      WlrLayershell.layer: WlrLayer.Overlay
+      WlrLayershell.namespace: "hyprlarp-display-confirm"
+      WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+      DisplayConfirmation {
+        id: confirmation
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(520, parent.width - 24)
+      }
+    }
+  }
   BarGeometry {
     id: activeLayout
     configuration: BarLayout.forScreen(ShellState.activeScreen)
@@ -61,7 +86,7 @@ Scope {
         exclusionMode: layout.reserveSpace ? ExclusionMode.Normal : ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "hyprlarp-bar"
-        BackgroundEffect.blurRegion: layout.configuration.barBlur ? blurRegion : null
+        BackgroundEffect.blurRegion: layout.configuration.barBlur && Theme.effectsEnabled ? blurRegion : null
         Region {
           id: blurRegion
           item: barContent
@@ -124,8 +149,14 @@ Scope {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "hyprlarp-panel"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    BackgroundEffect.blurRegion: Theme.blurEnabled ? panelBlurRegion : null
     PanelOverlay {
+      id: activePanel
       anchors.fill: parent
+    }
+    Region {
+      id: panelBlurRegion
+      item: activePanel.surface
     }
   }
   PanelWindow {

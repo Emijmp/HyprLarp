@@ -4,19 +4,14 @@
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import copy
-import datetime as dt
 import json
-import math
 import os
 from pathlib import Path
-import re
 import signal
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from typing import Any
@@ -28,13 +23,19 @@ if __package__:
   from .clipboard import Clipboard
   from .captures import Captures
   from .battery import battery_state
+  from .battery_alerts import BatteryAlerts
+  from .faults import FaultRegistry
+  from .performance import Performance
   from .udev import UdevEvents
   from .devices import Devices
   from .night import NightLight
   from .wallpapers import EXTENSIONS, catalogue, local_path
+  from .wallpaper_palette import PaletteExtractor
+  from .theme_context import effective_name
   from .bluetooth import BluetoothManager
   from .wifi import WifiSecrets
   from .gaps import WindowGaps, values as window_gaps_values
+  from .displays import Displays
   from .shortcuts import chord_parts, chord_key, validate_custom, validate_combined, render as render_bindings
   from .safety import BoundedExecutor, JSON_LIMIT, bounded_process, private_directory, read_json, read_regular, stop_processes, idle_processes, parse_json
 else:
@@ -44,414 +45,48 @@ else:
   from clipboard import Clipboard
   from captures import Captures
   from battery import battery_state
+  from battery_alerts import BatteryAlerts
+  from faults import FaultRegistry
+  from performance import Performance
   from udev import UdevEvents
   from devices import Devices
   from night import NightLight
   from wallpapers import EXTENSIONS, catalogue, local_path
+  from wallpaper_palette import PaletteExtractor
+  from theme_context import effective_name
   from bluetooth import BluetoothManager
   from wifi import WifiSecrets
   from gaps import WindowGaps, values as window_gaps_values
+  from displays import Displays
   from shortcuts import chord_parts, chord_key, validate_custom, validate_combined, render as render_bindings
   from safety import BoundedExecutor, JSON_LIMIT, bounded_process, private_directory, read_json, read_regular, stop_processes, idle_processes, parse_json
 
-ROOT = Path(__file__).resolve().parents[1]
-MODULE_DEFINITIONS = json.loads((ROOT / "config/modules.json").read_text())
-MODULES = {entry["id"] for entry in MODULE_DEFINITIONS}
-PANELS = {entry["target"] for entry in MODULE_DEFINITIONS if entry["kind"] == "panel"} | {"settings"}
-PALETTES = json.loads((ROOT / "config/palettes.json").read_text())
-THEMES = set(PALETTES) | {"custom"}
-COLOR_ROLES = set(PALETTES["amoled"]) - {"name"}
-SETTINGS_ACTIONS = {"settings", "settings-undo", "settings-redo", "settings-reset", "settings-reset-section", "profile-apply", "settings-import", "theme-use"}
-SETTINGS_HISTORY_LIMIT = 50
-# 500 normalized notices can exceed the ordinary IPC budget with UTF-8 or escapes.
-# History is persisted synchronously, so this allowance never enters the work queue.
-NOTIFICATION_JSON_LIMIT = 16 * 1024 * 1024
-DEFAULTS = json.loads((ROOT / "config/defaults.json").read_text())
-COMMAND_PROFILE = os.environ.get("HYPRLARP_COMMAND_PROFILE", "")
+try:
+  from .settings_schema import ROOT, MODULE_DEFINITIONS, MODULES, PANELS, PALETTES, THEMES, COLOR_ROLES, SETTINGS_ACTIONS, SETTINGS_HISTORY_LIMIT, NOTIFICATION_JSON_LIMIT, DEFAULTS, COMMAND_PROFILE, number, validate_setting, migrate_settings, shortcut_key, geometry_minimum, validate_geometry
+  from .persistence import atomic_bytes, atomic_text, atomic_json
+  from .settings_store import Store as SettingsStore
+except ImportError:
+  from settings_schema import ROOT, MODULE_DEFINITIONS, MODULES, PANELS, PALETTES, THEMES, COLOR_ROLES, SETTINGS_ACTIONS, SETTINGS_HISTORY_LIMIT, NOTIFICATION_JSON_LIMIT, DEFAULTS, COMMAND_PROFILE, number, validate_setting, migrate_settings, shortcut_key, geometry_minimum, validate_geometry
+  from persistence import atomic_bytes, atomic_text, atomic_json
+  from settings_store import Store as SettingsStore
 
 
-def atomic_bytes(destination: Path, value: bytes) -> None:
-  destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-  fd, temp = tempfile.mkstemp(prefix=".hyprlarp-", dir=destination.parent)
-  try:
-    with os.fdopen(fd, "wb") as handle:
-      handle.write(value)
-    os.replace(temp, destination)
-  finally:
-    if os.path.exists(temp):
-      os.unlink(temp)
-
-
-def atomic_text(destination: Path, value: str) -> None:
-  atomic_bytes(destination, value.encode("utf-8"))
-
-
-def atomic_json(destination: Path, value: Any) -> None:
-  atomic_text(destination, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
-
-
-def number(value: Any, low: float, high: float) -> float:
-  if isinstance(value, bool) or not isinstance(value, (int, float)):
-    raise ValueError("Se esperaba un número")
-  if not low <= value <= high:
-    raise ValueError(f"El valor debe estar entre {low} y {high}")
-  return value
-
-
-def validate_setting(key: str, value: Any) -> Any:
-  if key not in DEFAULTS or key == "version":
-    raise ValueError("Ajuste desconocido")
-  if key in {"animations", "doNotDisturb", "clipboardEnabled", "clipboardPaused", "osdEnabled", "nightLightEnabled", "nightLightSchedule", "barEnabled", "barReserveSpace", "barBlur", "barShowLabels", "showAppIcons", "migrateNoctaliaBinds", "waypaperRestoreOnStartup", "windowGapsEnabled", "windowGapsLinked"}:
-    if not isinstance(value, bool):
-      raise ValueError("Se esperaba verdadero o falso")
-  elif key in {"barOpacity", "moduleOpacity", "moduleBackgroundOpacity", "panelOpacity"}:
-    number(value, 0, 1)
-  elif key in {"radius", "moduleRadius"}:
-    value = int(number(value, 0, 8))
-  elif key == "barWorkspaceDisplay":
-    if value not in {"current", "dots", "compact"}:
-      raise ValueError("Indicador de espacios desconocido")
-  elif key == "nightLightTemperature":
-    value = int(number(value, 1000, 6500))
-  elif key == "osdTimeout":
-    value = int(number(value, 500, 5000))
-  elif key == "osdPosition":
-    if value not in {"top", "bottom"}:
-      raise ValueError("Posición del OSD desconocida")
-  elif key in {"nightLightStart", "nightLightEnd"}:
-    if not isinstance(value, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
-      raise ValueError("Usa una hora de 00:00 a 23:59")
-  elif key == "cornerRadii":
-    allowed = {"bar", "panel", "button", "field", "workspace", "notification", "tooltip"}
-    if not isinstance(value, dict) or set(value) - allowed:
-      raise ValueError("Tipo de elemento desconocido para la redondez")
-    value = {kind: int(number(radius, 0, 8)) for kind, radius in value.items()}
-  elif key in {"barMargin", "barPaddingX", "barPaddingY", "barSpacing"}:
-    value = int(number(value, 0, 64))
-  elif key == "windowGapsIn":
-    value = int(number(value, 0, 64))
-  elif key == "windowGapsOut":
-    if not isinstance(value, dict) or set(value) != {"top", "right", "bottom", "left"}:
-      raise ValueError("Indica los cuatro bordes de la pantalla")
-    value = {edge: int(number(gap, 0, 128)) for edge, gap in value.items()}
-  elif key in {"modulePaddingX", "modulePaddingY"}:
-    value = int(number(value, 0, 32))
-  elif key == "barMargins":
-    if not isinstance(value, dict) or set(value) != {"top", "right", "bottom", "left"}:
-      raise ValueError("Indica los cuatro márgenes de la barra")
-    value = {edge: int(number(margin, 0, 64)) for edge, margin in value.items()}
-  elif key in {"barBorderWidth", "moduleBorderWidth"}:
-    value = int(number(value, 0, 4))
-  elif key == "barSize":
-    value = int(number(value, 22, 128))
-  elif key == "barLength":
-    value = int(number(value, 25, 100))
-  elif key in {"barFontSize", "barIconSize"}:
-    value = int(number(value, 10, 24))
-  elif key == "barWorkspaceCount":
-    value = int(number(value, 1, 10))
-  elif key == "decoration":
-    if value not in {"minimal", "subtle"}:
-      raise ValueError("Nivel de detalle desconocido")
-  elif key == "decorationOptions":
-    if not isinstance(value, dict) or set(value) - set(DEFAULTS["decorationOptions"]) or any(not isinstance(item, bool) for item in value.values()):
-      raise ValueError("Opciones de decoración inválidas")
-  elif key == "barAlignment":
-    if value not in {"start", "center", "end"}:
-      raise ValueError("Alineación desconocida")
-  elif key == "notificationHistoryLimit":
-    value = int(number(value, 0, 500))
-  elif key == "clipboardRetentionHours":
-    value = int(number(value, 0, 8760))
-  elif key == "barZones":
-    value = validate_zones(value, MODULES)
-  elif key == "monitorBars":
-    value = validate_monitor_bars(value, validate_setting)
-  elif key == "trayHiddenItems":
-    if not isinstance(value, list) or len(value) > 100 or any(not isinstance(item, str) or len(item) > 256 for item in value):
-      raise ValueError("Lista de iconos oculta inválida")
-    value = list(dict.fromkeys(value))
-  elif key == "notificationRules":
-    if not isinstance(value, dict) or len(value) > 200:
-      raise ValueError("Reglas de notificación inválidas")
-    for app, rule in value.items():
-      if not isinstance(app, str) or not 1 <= len(app) <= 256 or not isinstance(rule, dict) or set(rule) - {"popup", "sound", "history"} or any(not isinstance(flag, bool) for flag in rule.values()):
-        raise ValueError("Regla por aplicación inválida")
-  elif key == "theme":
-    if value not in THEMES:
-      raise ValueError("Tema desconocido")
-  elif key == "customPalette":
-    if not isinstance(value, dict) or set(value) != COLOR_ROLES | {"name"}:
-      raise ValueError("La paleta debe incluir un nombre y todos los colores")
-    name = value["name"]
-    if not isinstance(name, str) or not 1 <= len(name.strip()) <= 40 or any(ord(character) < 32 for character in name):
-      raise ValueError("El nombre del tema debe tener entre 1 y 40 caracteres")
-    for role in COLOR_ROLES:
-      if not isinstance(value[role], str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value[role]):
-        raise ValueError(f"Color inválido en {role}: usa #RRGGBB")
-    value = {key: color.lower() if key != "name" else name.strip() for key, color in value.items()}
-  elif key == "barPosition":
-    if value not in {"top", "bottom", "left", "right"}:
-      raise ValueError("Posición de barra desconocida")
-  elif key == "wallpaperProvider":
-    if not isinstance(value, str) or value not in {"internal", "external"}:
-      raise ValueError("Gestor de fondos desconocido")
-  elif key == "accent":
-    if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-      raise ValueError("Usa un color hexadecimal: #ffffff")
-  elif key in {"barModules", "disabledModules"}:
-    if not isinstance(value, list) or any(x not in MODULES for x in value):
-      raise ValueError("Módulo desconocido")
-    if len(value) != len(set(value)):
-      raise ValueError("Un módulo no puede aparecer dos veces")
-  elif key == "moduleOpacities":
-    if not isinstance(value, dict) or set(value) - MODULES:
-      raise ValueError("Módulo desconocido")
-    for opacity in value.values():
-      number(opacity, 0, 1)
-  elif key == "shortcuts":
-    if not isinstance(value, dict) or set(value) != set(DEFAULTS["shortcuts"]):
-      raise ValueError("Lista de atajos inválida")
-    used = set()
-    for chord in value.values():
-      if chord == "":
-        continue
-      chord_parts(chord)
-      canonical = shortcut_key(chord)
-      if canonical in used:
-        raise ValueError("Hay atajos duplicados")
-      used.add(canonical)
-  elif key == "customBindings":
-    value = validate_custom(value, DEFAULTS["shortcuts"])
-  elif key in {"wallpaper", "wallpaperDirectory", "font"}:
-    if not isinstance(value, str) or len(value) > 4096 or "\0" in value:
-      raise ValueError("Texto inválido")
-    if key == "wallpaper" and value:
-      candidate = local_path(value)
-      if not candidate.is_file() or candidate.suffix.lower() not in EXTENSIONS:
-        raise ValueError("El fondo debe ser una imagen local existente")
-      value = str(candidate.resolve())
-    elif key == "wallpaperDirectory" and value:
-      candidate = local_path(value)
-      if not candidate.is_dir():
-        raise ValueError("La carpeta de fondos no existe")
-      value = str(candidate)
-  return value
-
-
-def migrate_settings(saved: dict) -> dict:
-  migrated = copy.deepcopy(saved)
-  version = migrated.get("version", 1)
-  if not isinstance(version, int) or isinstance(version, bool) or version < 2:
-    old_theme = migrated.get("theme", "graphite")
-    if isinstance(old_theme, str) and old_theme in {"graphite", "nocturne", "sage", "paper"}:
-      for key in ("theme", "accent", "radius", "animations", "barOpacity", "moduleOpacity", "panelOpacity", "moduleOpacities"):
-        migrated[key] = copy.deepcopy(DEFAULTS[key])
-    if migrated.get("barSize", 48) == 48:
-      migrated["barSize"] = DEFAULTS["barSize"]
-    margin = migrated.get("barMargin", DEFAULTS["barMargin"])
-    migrated.setdefault("barMargins", {edge: margin for edge in ("top", "right", "bottom", "left")})
-    wallpaper = migrated.get("wallpaper", "")
-    if isinstance(wallpaper, str) and wallpaper in {str(ROOT / "assets/wallpapers" / name) for name in ("prism.svg", "monolith.svg", "orbit.svg")}:
-      migrated["wallpaper"] = ""
-  if not isinstance(version, int) or isinstance(version, bool) or version < 3:
-    modules = migrated.get("barModules", DEFAULTS["barModules"])
-    disabled = migrated.get("disabledModules", [])
-    if isinstance(modules, list) and all(isinstance(name, str) for name in modules):
-      excluded = {name for name in disabled if isinstance(name, str)} if isinstance(disabled, list) else set()
-      migrated["barModules"] = [name for name in dict.fromkeys(modules) if name not in excluded]
-    migrated["disabledModules"] = []
-    migrated["showAppIcons"] = True
-    previous = migrated.get("shortcuts", {})
-    if isinstance(previous, dict):
-      shortcuts = {key: value for key, value in previous.items() if key in DEFAULTS["shortcuts"]}
-      used = {shortcut_key(value) for value in shortcuts.values() if isinstance(value, str) and "," in value}
-      for key, chord in DEFAULTS["shortcuts"].items():
-        if key not in shortcuts:
-          shortcuts[key] = "" if shortcut_key(chord) in used else chord
-          if shortcuts[key]:
-            used.add(shortcut_key(chord))
-      migrated["shortcuts"] = shortcuts
-  migrated["version"] = 3
-  if "barZones" not in migrated and isinstance(migrated.get("barModules"), list):
-    migrated["barZones"] = zones_for(migrated["barModules"])
-  if isinstance(migrated.get("shortcuts"), dict):
-    shortcuts = {key: value for key, value in migrated["shortcuts"].items() if key in DEFAULTS["shortcuts"]}
-    used = {shortcut_key(chord) for chord in shortcuts.values() if isinstance(chord, str) and "," in chord}
-    for key, chord in DEFAULTS["shortcuts"].items():
-      if key not in shortcuts:
-        shortcuts[key] = "" if shortcut_key(chord) in used else chord
-        if shortcuts[key]:
-          used.add(shortcut_key(chord))
-    migrated["shortcuts"] = shortcuts
-  return migrated
-
-
-def shortcut_key(chord: str) -> tuple:
-  return chord_key(chord)
-
-
-def geometry_minimum(settings: dict) -> int:
-  # The cross-axis padding must leave space for the text and icons.
-  vertical = settings["barPosition"] in {"left", "right"}
-  padding = settings["barPaddingX" if vertical else "barPaddingY"]
-  inner = settings["modulePaddingX" if vertical else "modulePaddingY"]
-  return 2 * (padding + settings["barBorderWidth"] + inner + settings["moduleBorderWidth"]) + max(settings["barIconSize"], settings["barFontSize"] + 4)
-
-
-def validate_geometry(settings: dict) -> None:
-  minimum = geometry_minimum(settings)
-  if settings["barSize"] < minimum:
-    raise ValueError(f"Con ese padding y tamaño de contenido, el grosor mínimo es {minimum} px")
-  for name, overrides in settings.get("monitorBars", {}).items():
-    try:
-      validate_geometry({**settings, **overrides, "monitorBars": {}})
-    except ValueError as error:
-      raise ValueError(f"Monitor {name}: {error}") from error
-
-
-class Store:
+class Store(SettingsStore):
+  # Keep the existing public import and injectable writer used by integrations.
   def __init__(self, directory: Path):
-    self.directory = private_directory(directory)
-    self.file = directory / "settings.json"
-    self.lock = threading.RLock()
-    self.settings = copy.deepcopy(DEFAULTS)
-    self.warning = ""
-    self.undo_stack: list[dict] = []
-    self.redo_stack: list[dict] = []
-    if self.file.exists():
-      try:
-        saved = read_json(self.file)
-        if not isinstance(saved, dict):
-          raise ValueError("La configuración no es un objeto JSON")
-        saved = migrate_settings(saved)
-        for key, value in saved.items():
-          if key in DEFAULTS and key != "version":
-            try:
-              self.settings[key] = validate_setting(key, value)
-            except (ValueError, TypeError):
-              self.warning = f"Se ignoró un ajuste inválido: {key}"
-        for name, override in list(self.settings["monitorBars"].items()):
-          effective = {**self.settings, **override, "monitorBars": {}}
-          minimum = geometry_minimum(effective)
-          if minimum > 128:
-            del self.settings["monitorBars"][name]
-            self.warning = f"Se ignoró la geometría inválida del monitor {name}"
-          elif effective["barSize"] < minimum:
-            override["barSize"] = minimum
-            self.warning = f"Se ajustó el grosor del monitor {name}"
-        try:
-          validate_geometry(self.settings)
-        except ValueError:
-          content = max(self.settings["barIconSize"], self.settings["barFontSize"] + 4)
-          for key in ("barPaddingX", "barPaddingY"):
-            inner = self.settings["modulePaddingX" if key == "barPaddingX" else "modulePaddingY"]
-            maximum_padding = (128 - content) // 2 - self.settings["barBorderWidth"] - inner - self.settings["moduleBorderWidth"]
-            self.settings[key] = min(self.settings[key], maximum_padding)
-          self.settings["barSize"] = max(self.settings["barSize"], geometry_minimum(self.settings))
-          self.warning = "Se ajustó la geometría de la barra para mantener el contenido visible"
-          validate_geometry(self.settings)
-        try:
-          validate_combined(self.settings)
-        except ValueError:
-          self.settings["customBindings"] = []
-          self.warning = "Se ignoraron binds personalizados con combinaciones duplicadas"
-      except (ValueError, OSError) as error:
-        self.warning = f"No se pudo leer settings.json: {error}"
-
-  def update(self, updates: dict, *, record: bool = True) -> dict:
-    if not isinstance(updates, dict):
-      raise ValueError("Los ajustes deben ser un objeto")
-    validated = {key: validate_setting(key, value) for key, value in updates.items()}
-    with self.lock:
-      merged = synchronize_layout(self.settings, validated)
-      if merged["theme"] == "custom":
-        palette = copy.deepcopy(merged["customPalette"])
-        if "accent" in validated:
-          palette["accent"] = validated["accent"]
-        merged["customPalette"] = palette
-        merged["accent"] = palette["accent"]
-      elif "theme" in validated and "accent" not in validated:
-        merged["accent"] = PALETTES[merged["theme"]]["accent"]
-      if "barMargin" in validated and "barMargins" not in validated:
-        merged["barMargins"] = {edge: validated["barMargin"] for edge in ("top", "right", "bottom", "left")}
-      validate_geometry(merged)
-      validate_combined(merged)
-      self._commit(merged, record=record)
-      return copy.deepcopy(self.settings)
-
-  def _commit(self, settings: dict, force: bool = False, record: bool = True) -> None:
-    changed = {key for key in settings if settings[key] != self.settings[key]}
-    if changed or force:
-      # Mutate the history only after persistence succeeds.
-      atomic_json(self.file, settings)
-    if changed:
-      if record:
-        entry = {"before": {key: copy.deepcopy(self.settings[key]) for key in changed},
-             "after": {key: copy.deepcopy(settings[key]) for key in changed}}
-        self.undo_stack = (self.undo_stack + [entry])[-SETTINGS_HISTORY_LIMIT:]
-        self.redo_stack.clear()
-      else:
-        # Changes from shell panels must survive configuration undo/redo.
-        self._forget_external_keys(changed)
-      self.settings = copy.deepcopy(settings)
-
-  def _forget_external_keys(self, keys: set) -> None:
-    def remaining(stack):
-      result = []
-      for entry in stack:
-        before = {key: value for key, value in entry["before"].items() if key not in keys}
-        if before:
-          result.append({"before": before, "after": {key: entry["after"][key] for key in before}})
-      return result
-    self.undo_stack = remaining(self.undo_stack)
-    self.redo_stack = remaining(self.redo_stack)
-
-  def history_state(self) -> dict:
-    with self.lock:
-      return {"undo": len(self.undo_stack), "redo": len(self.redo_stack)}
-
-  def undo(self) -> dict:
-    with self.lock:
-      if self.undo_stack:
-        entry = self.undo_stack[-1]
-        target = {**self.settings, **copy.deepcopy(entry["before"])}
-        validate_geometry(target)
-        atomic_json(self.file, target)
-        self.redo_stack.append(self.undo_stack.pop())
-        self.settings = target
-      return copy.deepcopy(self.settings)
-
-  def redo(self) -> dict:
-    with self.lock:
-      if self.redo_stack:
-        entry = self.redo_stack[-1]
-        target = {**self.settings, **copy.deepcopy(entry["after"])}
-        validate_geometry(target)
-        atomic_json(self.file, target)
-        self.undo_stack.append(self.redo_stack.pop())
-        self.settings = target
-      return copy.deepcopy(self.settings)
-
-  def reset(self) -> dict:
-    with self.lock:
-      self._commit(copy.deepcopy(DEFAULTS), force=True)
-      self.warning = ""
-      return copy.deepcopy(self.settings)
+    super().__init__(directory, writer=lambda path, value: atomic_json(path, value))
 
 
 def palette_for(settings: dict) -> dict:
   return settings["customPalette"] if settings["theme"] == "custom" else PALETTES[settings["theme"]]
 
 
-def render_lock_config(settings: dict) -> str:
-  palette = palette_for(settings)
-  template = (ROOT / "config/hyprlock.conf").read_text()
-  defaults = {"background": "000000", "foreground": "ffffff", "muted": "a0a0a0"}
-  colors = {"background": palette["background"], "foreground": palette["text"], "muted": palette["muted"]}
-  for role, default in defaults.items():
-    template = template.replace(f"${role} = rgb({default})", f"${role} = rgb({colors[role][1:]})")
-  return template
+def render_lock_config(settings: dict, **options) -> str:
+  if __package__:
+    from .lockscreen import render
+  else:
+    from lockscreen import render
+  return render(settings, PALETTES, **options)
 
 
 def command(argv: list[str], *, input_text: str | None = None,
@@ -529,106 +164,10 @@ def parse_networks(output: str) -> list[dict]:
   return sorted(networks.values(), key=lambda item: (not item["connected"], -item["signal"]))
 
 
-def brightness_state(base: Path = Path("/sys/class/backlight")) -> dict:
-  for device in sorted(base.glob("*")):
-    try:
-      maximum = int((device / "max_brightness").read_text())
-      source = device / "actual_brightness"
-      current = int((source if source.exists() else device / "brightness").read_text())
-      if maximum > 0:
-        return {"brightness": round(100 * current / maximum), "brightnessAvailable": True}
-    except (OSError, ValueError):
-      continue
-  return {"brightness": 0, "brightnessAvailable": False}
-
-
-def poll_intervals(settings: dict, panel: str, settings_only: bool = False, native_services: bool = False, outputs: list[str] | None = None) -> dict[str, float]:
-  """No idle CPU sampling or child processes for panels that are closed."""
-  if settings_only:
-    return {}
-  names = [""] if outputs is None else outputs
-  modules = set()
-  for name in names:
-    bar = {**settings, **settings.get("monitorBars", {}).get(name, {})}
-    if bar.get("barEnabled", True):
-      modules.update(bar["barModules"])
-  modules -= set(settings["disabledModules"])
-  plan = {}
-  if "resources" in modules or panel in {"resources", "control"}:
-    plan["metrics"] = 2
-  if panel in {"control", "brightness"} or "brightness" in modules:
-    plan["brightness"] = 2
-  if panel == "battery":
-    plan["battery"] = 2
-  elif panel == "control" or "battery" in modules:
-    plan["battery"] = 30
-  if not native_services and ("wifi" in modules or panel in {"wifi", "control"}):
-    plan["network"] = 60
-  if panel == "clipboard" and settings["clipboardEnabled"]:
-    plan["clipboard"] = 2
-  if not native_services and panel == "bluetooth":
-    plan["bluetooth"] = 6
-  if settings.get("clipboardEnabled") and settings.get("clipboardRetentionHours", 0):
-    plan["clipboard-expiry"] = 60
-  return plan
-
-
-class Metrics:
-  def __init__(self):
-    self.previous_cpu: tuple[int, int] | None = None
-    self.previous_network: tuple[float, int, int] | None = None
-    self.disk_sample = {}
-    self.disk_at = 0
-    self.thermal_path = None
-    self.thermal_at = 0
-
-  def read(self, detailed=True) -> dict:
-    data: dict[str, Any] = {"cpu": None, "memory": 0, "memoryUsed": 0, "memoryTotal": 0,
-                "disk": 0, "temperature": None, "upload": 0, "download": 0}
-    try:
-      with Path("/proc/stat").open() as cpu:
-        times = [int(x) for x in cpu.readline().split()[1:9]]
-      total, idle = sum(times), times[3] + times[4]
-      if self.previous_cpu:
-        delta = total - self.previous_cpu[0]
-        data["cpu"] = round(100 * (1 - (idle - self.previous_cpu[1]) / max(1, delta)), 1)
-      self.previous_cpu = (total, idle)
-      memory = {line.split(":")[0]: int(line.split()[1]) for line in Path("/proc/meminfo").read_text().splitlines()}
-      data["memoryTotal"] = round(memory["MemTotal"] / 1024**2, 1)
-      data["memoryUsed"] = round((memory["MemTotal"] - memory["MemAvailable"]) / 1024**2, 1)
-      data["memory"] = round(100 * (1 - memory["MemAvailable"] / memory["MemTotal"]), 1)
-      if not detailed:
-        return {key: data[key] for key in ("cpu", "memory", "memoryUsed", "memoryTotal")}
-      now = time.monotonic()
-      if not self.disk_sample or now - self.disk_at >= 10:
-        disk = shutil.disk_usage(Path.home())
-        self.disk_sample = {"disk": round(100 * disk.used / disk.total, 1), "diskFree": round(disk.free / 1024**3, 1)}
-        self.disk_at = now
-      data.update(self.disk_sample)
-      data["uptime"] = int(float(Path("/proc/uptime").read_text().split()[0]))
-      received, sent = 0, 0
-      for line in Path("/proc/net/dev").read_text().splitlines()[2:]:
-        interface, values = line.split(":", 1)
-        if interface.strip() == "lo":
-          continue
-        values = values.split()
-        received += int(values[0])
-        sent += int(values[8])
-      now = time.monotonic()
-      if self.previous_network:
-        elapsed = max(0.01, now - self.previous_network[0])
-        data["download"] = max(0, round((received - self.previous_network[1]) / elapsed / 1024))
-        data["upload"] = max(0, round((sent - self.previous_network[2]) / elapsed / 1024))
-      self.previous_network = (now, received, sent)
-      if now - self.thermal_at >= 60 or self.thermal_at == 0:
-        self.thermal_at = now
-        self.thermal_path = next((zone / "temp" for zone in sorted(Path("/sys/class/thermal").glob("thermal_zone*"))
-          if (zone / "type").read_text().strip() in {"x86_pkg_temp", "cpu-thermal", "k10temp", "acpitz"}), None)
-      if self.thermal_path:
-        data["temperature"] = round(int(self.thermal_path.read_text()) / 1000)
-    except (OSError, ValueError, KeyError, IndexError):
-      pass
-    return data
+try:
+  from .metrics import Metrics, brightness_state, poll_intervals
+except ImportError:
+  from metrics import Metrics, brightness_state, poll_intervals
 
 
 def lua_string(value: str) -> str:
@@ -659,6 +198,14 @@ class Service:
     self.stopping = threading.Event()
     self.wakeup = threading.Event()
     self.metrics = Metrics()
+    self.performance = Performance(ROOT, store.directory, preview=preview, settings_only=settings_only)
+    self.wallpaper_palette = PaletteExtractor()
+    self.synced_context_theme = None
+    self.battery_alerts = BatteryAlerts(store.directory)
+    scopes = {'panel:' + name for name in PANELS} | {'bar:' + name for name in MODULES}
+    scopes |= {'page:' + name for name in ['Appearance', 'Bar', 'Modules', 'Wallpapers', 'Shortcuts', 'General', 'Profiles', 'Displays']}
+    scopes |= {'backend:' + name for name in ['wifi', 'bluetooth', 'wallpapers', 'clipboard', 'metrics', 'brightness', 'battery', 'network', 'displays', 'night-light', 'window-gaps', 'usb', 'power', 'waypaper-restore', 'performance']}
+    self.faults = FaultRegistry(store.directory, scopes)
     self.system_lock = threading.Lock()
     self.system = {"user": os.environ.get("USER", "tú"), "hostname": os.uname().nodename}
     self.snapshot_lock = threading.Lock()
@@ -675,7 +222,13 @@ class Service:
     self.pending_refresh = {}
     self.icon_resolver = None
     self.icon_lock = threading.Lock()
+    self.launcher_search = None
     self.executor = BoundedExecutor(max_workers=3, pending=12)
+    if __package__:
+      from .actions import SystemActions
+    else:
+      from actions import SystemActions
+    self.system_actions = SystemActions(self, sys.modules[__name__])
     self.features = Features(self, sys.modules[__name__])
     self.clipboard_manager = Clipboard(self, sys.modules[__name__])
     self.captures = Captures(self, sys.modules[__name__])
@@ -683,6 +236,7 @@ class Service:
     self.bluetooth_manager = BluetoothManager(self)
     self.wifi_secrets = WifiSecrets()
     self.window_gaps = WindowGaps(self, sys.modules[__name__])
+    self.displays = Displays(self, sys.modules[__name__])
     self.night = NightLight(self, sys.modules[__name__])
     self.backlight = UdevEvents("backlight", lambda: self.queue_refresh("brightness-event", lambda: self.refresh_system(brightness=True), latest=True))
 
@@ -700,8 +254,24 @@ class Service:
         self.snapshots[kind] = copy.deepcopy(data)
         self.emit(kind, data)
 
+  def sync_theme_context(self):
+    """Reuse the installed oneshot bridge only when the effective theme changes."""
+    if self.preview or self.settings_only or self.stopping.is_set():
+      return
+    name = effective_name(self.store.settings)
+    if name == self.synced_context_theme:
+      return
+    config = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+    unit = config / 'systemd/user/hyprlarp-greeter-sync.service'
+    if not unit.is_file() or unit.is_symlink():
+      return
+    command(['systemctl', '--user', 'start', '--no-block', 'hyprlarp-greeter-sync.service'], timeout=3)
+    self.synced_context_theme = name
+
   def queue_refresh(self, name: str, function, latest: bool = False) -> bool:
     """One worker per source, with at most one coalesced follow-up for events."""
+    if self.faults.blocked('backend:' + name):
+      return False
     with self.refresh_lock:
       if name in self.refreshing:
         if latest:
@@ -713,7 +283,7 @@ class Service:
     def run():
       current = function
       while current is not None:
-        self.safe_refresh(current)
+        self.safe_refresh(current, scope='backend:' + name)
         with self.refresh_lock:
           current = self.pending_refresh.pop(name, None) if not self.stopping.is_set() else None
           if current is None:
@@ -771,6 +341,10 @@ class Service:
       if battery:
         self.system["battery"] = battery_state()
       self.emit_changed("system", self.system)
+      if battery and not self.preview and not self.settings_only:
+        alert = self.battery_alerts.update(self.system["battery"], self.store.settings)
+        if alert:
+          self.emit("battery-alert", alert)
 
   def restore_waypaper(self):
     if self.preview:
@@ -779,6 +353,11 @@ class Service:
       raise ValueError("Selecciona Externo en Fondos antes de restaurar Waypaper")
     command(["waypaper", "--restore"], timeout=15)
     self.emit("message", "Fondo restaurado mediante Waypaper")
+
+  def refresh_performance(self):
+    with self.performance.lock:
+      if self.performance.open and not self.performance.paused:
+        self.emit('performance', self.performance.sample(self.store.settings))
 
   def start_external_wallpaper(self):
     if not self.preview and not self.settings_only and self.store.settings["wallpaperProvider"] == "external" and self.store.settings["waypaperRestoreOnStartup"]:
@@ -819,12 +398,24 @@ class Service:
     else:
       self.backlight.stop()
 
+  def polling_plan(self):
+    plan = poll_intervals(self.store.settings, self.active_panel, self.settings_only, self.native_services, self.output_names)
+    if self.performance.paused:
+      plan.pop('performance', None)
+    return plan
+
+  def refresh_polled(self, name, function):
+    # A device operation may keep a worker busy until after its panel closes.
+    # Recheck demand when the queued read actually gets a worker.
+    if not self.stopping.is_set() and name in self.polling_plan():
+      function()
+
   def poll(self) -> None:
     due, previous = {}, {}
     self.refresh_system(battery=True)
     while not self.stopping.is_set():
       self.wakeup.clear()
-      plan = poll_intervals(self.store.settings, self.active_panel, self.settings_only, self.native_services, self.output_names)
+      plan = self.polling_plan()
       now = time.monotonic()
       for name in set(due) - set(plan):
         del due[name]
@@ -832,7 +423,11 @@ class Service:
           with self.system_lock:
             self.metrics.previous_cpu = None
             self.metrics.previous_network = None
+        if name == 'performance':
+          with self.performance.lock:
+            self.performance.sampler.reset()
       sources = {"metrics": lambda: self.refresh_system(metrics=True),
+            "performance": self.refresh_performance,
             "brightness": lambda: self.refresh_system(brightness=True),
             "battery": lambda: self.refresh_system(battery=True),
             "network": self.refresh_network, "bluetooth": self.refresh_bluetooth,
@@ -840,17 +435,21 @@ class Service:
             "clipboard-expiry": lambda: self.clipboard_manager.refresh(expire=True)}
       for name, interval in plan.items():
         if previous.get(name) != interval or now >= due.get(name, 0):
-          self.queue_refresh("wifi" if name == "network" else name, sources[name])
+          self.queue_refresh("wifi" if name == "network" else name,
+            lambda name=name, function=sources[name]: self.refresh_polled(name, function))
           due[name] = now + interval
       previous = plan
       timeout = max(0.05, min(due.values()) - time.monotonic()) if due else None
       self.wakeup.wait(timeout)
 
-  def safe_refresh(self, function) -> None:
+  def safe_refresh(self, function, scope=None) -> None:
     try:
       function()
     except Exception as error:
       self.emit("error", str(error))
+      if scope in self.faults.allowed and not isinstance(error, (OSError, ValueError, RuntimeError, subprocess.SubprocessError)):
+        self.faults.report(scope, str(error))
+        self.emit('faults', self.faults.snapshot())
 
   def emit_settings(self) -> None:
     self.emit("settings-history", self.store.history_state())
@@ -859,6 +458,7 @@ class Service:
   def edit_settings(self, action: str, data: dict, source: str = "shell") -> None:
     if action != "settings" and (not self.configuration_focused or source != "config"):
       raise ValueError("Abre y enfoca la configuración para deshacer, rehacer o restablecer")
+    previous_warning = self.store.warning
     previous_directory = self.store.settings["wallpaperDirectory"]
     previous_provider = self.store.settings["wallpaperProvider"]
     previous_gaps = window_gaps_values(self.store.settings)
@@ -870,8 +470,13 @@ class Service:
       self.store.redo()
     elif action == "settings-reset":
       self.store.reset()
+    elif action == "settings-restore-revision":
+      updates = self.store.revisions.get(data.get("id"))["settings"]
+      self.store.update(updates)
     else:
       self.store.update(self.features.settings_updates(action, data))
+    if self.store.warning and self.store.warning != previous_warning:
+      self.emit("error", self.store.warning)
     self.safe_refresh(self.sync_watchers)
     self.safe_refresh(self.sync_hardware)
     if self.serving:
@@ -889,6 +494,35 @@ class Service:
     try:
       if action != "history" and not isinstance(data, dict):
         raise ValueError("Los datos de la acción deben ser un objeto")
+      if action == 'fault-report':
+        self.faults.report(data.get('id'), data.get('message'))
+        self.emit('faults', self.faults.snapshot())
+        return
+      if action == 'fault-reset':
+        self.faults.reset(data.get('id'))
+        self.emit('faults', self.faults.snapshot())
+        return
+      if action.startswith('performance-'):
+        self.performance.handle(action, data, self.store.settings)
+        if self.performance.open or action == 'performance-ready':
+          self.emit('performance', self.performance.snapshot())
+        self.wakeup.set()
+        self.emit('done', {'action': action})
+        return
+      if action == 'wallpaper-palette-extract':
+        if self.store.settings.get('wallpaperProvider') == 'external':
+          raise ValueError('El gestor externo no comparte su archivo actual con HyprLarp; selecciona el fondo desde Fondos para analizarlo')
+        self.emit('wallpaper-palette', self.wallpaper_palette.extract(self.store.settings.get('wallpaper', '')))
+        self.emit('done', {'action': action})
+        return
+      if action == 'theme-context-changed':
+        if not self.preview and not self.settings_only:
+          requested = data.get('theme')
+          if requested is not None and requested != effective_name(self.store.settings):
+            raise ValueError('El contexto del tema cambió; espera la actualización de la interfaz')
+          self.queue_refresh('theme-context', self.sync_theme_context, latest=True)
+        self.emit('done', {'action': action})
+        return
       if action in SETTINGS_ACTIONS:
         self.edit_settings(action, data, request.get("source", "shell"))
         return
@@ -898,7 +532,45 @@ class Service:
           raise ValueError("Estado de la ventana de configuración inválido")
         self.configuration_focused = focused
         return
+      if action in {"settings-revisions", "settings-revision-diff"}:
+        self.features.require_config(request)
+        with self.store.lock:
+          if action == "settings-revisions":
+            self.emit("settings-revisions", self.store.revisions.listing(self.store.settings))
+          else:
+            self.emit("settings-revision-diff", self.store.revisions.compare(data.get("id"), self.store.settings))
+        self.emit("done", {"action": action})
+        return
+      if action in {"diagnostics-run", "diagnostics-export"}:
+        self.features.require_config(request)
+        if __package__:
+          from . import diagnostics
+        else:
+          import diagnostics
+        report = diagnostics.collect(ROOT, directory=self.store.directory, include_logs=not self.preview)
+        self.emit("diagnostics", report)
+        if action == "diagnostics-export":
+          destination = self.features.path(data.get("path"))
+          diagnostics.export(report, destination)
+          self.emit("message", "Diagnóstico exportado: " + destination.name)
+        self.emit("done", {"action": action})
+        return
+      if action in {"launcher-query", "launcher-open"}:
+        if action == "launcher-query" and data.get("token") == "" and self.launcher_search is None:
+          return
+        if self.launcher_search is None:
+          if __package__:
+            from .launcher import LauncherSearch
+          else:
+            from launcher import LauncherSearch
+          self.launcher_search = LauncherSearch(self, sys.modules[__name__])
+        self.launcher_search.handle(action, data)
+        self.emit("done", {"action": action})
+        return
       if self.features.handle(request):
+        self.emit("done", {"action": action})
+        return
+      if self.displays.handle(action, data):
         self.emit("done", {"action": action})
         return
       if self.devices.handle(action, data):
@@ -927,14 +599,20 @@ class Service:
         atomic_json(self.store.directory / "notifications.json", cleaned)
         return
       if action == "panel":
+        if data.get("name") != "launcher" and self.launcher_search is not None:
+          self.launcher_search.cancel()
         if self.active_panel == "bluetooth" and data.get("name") != "bluetooth":
           self.bluetooth_manager.cancel()
           self.bluetooth_manager.stop_scan()
         self.active_panel = str(data.get("name", ""))
+        self.performance.set_open(self.active_panel == 'performance')
+        if self.performance.open:
+          self.emit('performance', self.performance.snapshot())
         self.sync_hardware()
         self.wakeup.set()
         refresh = {"wifi": self.refresh_network, "bluetooth": self.refresh_bluetooth,
-             "clipboard": self.refresh_clipboard, "wallpapers": self.refresh_wallpapers}
+             "clipboard": self.refresh_clipboard, "wallpapers": self.refresh_wallpapers,
+             "displays": self.displays.refresh}
         if self.active_panel in refresh and not (self.native_services and self.active_panel == "bluetooth"):
           self.queue_refresh(self.active_panel, refresh[self.active_panel])
         return
@@ -945,6 +623,8 @@ class Service:
         self.output_names = names
         self.sync_hardware()
         self.wakeup.set()
+        if not self.preview:
+          self.queue_refresh("displays", lambda: self.displays.refresh("event"), latest=True)
         return
       if action == "network-status":
         self.queue_refresh("wifi", self.refresh_network, latest=True)
@@ -974,86 +654,7 @@ class Service:
         refresh[name]()
         self.emit("done", {"action": action})
         return
-      if self.preview:
-        raise RuntimeError("La vista previa no modifica las conexiones ni la sesión")
-      if action == "volume":
-        command(["wpctl", "set-volume", "-l", "1", "@DEFAULT_AUDIO_SINK@", str(number(data.get("value"), 0, 1))])
-      elif action == "mute":
-        command(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
-      elif action == "brightness":
-        value = int(number(data.get("value"), 1, 100))
-        command(["brightnessctl", "set", f"{value}%"])
-        self.refresh_system(brightness=True)
-      elif action == "wifi-power":
-        if not isinstance(data.get("enabled"), bool):
-          raise ValueError("Estado Wi-Fi inválido")
-        command(["nmcli", "radio", "wifi", "on" if data.get("enabled") is True else "off"])
-        self.refresh_network()
-      elif action == "wifi-connect":
-        ssid = data.get("ssid")
-        if not isinstance(ssid, str) or not ssid or len(ssid.encode()) > 32:
-          raise ValueError("SSID inválido")
-        interface = data.get("interface") or next((entry["interface"] for entry in self.networks if entry["ssid"] == ssid), "")
-        if not isinstance(interface, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,32}", interface):
-          raise ValueError("Selecciona una red con un adaptador Wi-Fi disponible")
-        argv = ["nmcli", "--wait", "45", "device", "wifi", "connect", ssid, "ifname", interface]
-        password = data.get("password", "")
-        if not isinstance(password, str) or len(password) > 256 or "\0" in password:
-          raise ValueError("Contraseña inválida")
-        try:
-          if password:
-            security = next((entry["security"] for entry in self.networks if entry["ssid"] == ssid and entry["interface"] == interface), "")
-            profile = self.wifi_secrets.prepare(ssid, interface, password, security)
-            argv = ["nmcli", "--wait", "45", "connection", "up", "uuid", profile, "ifname", interface]
-          command(argv, timeout=50)
-        except (RuntimeError, ValueError) as error:
-          detail = str(error).replace(password, "[oculta]") if password else str(error)
-          raise RuntimeError("No se pudo conectar a la red: " + detail) from None
-        self.refresh_network()
-      elif action == "wifi-disconnect":
-        interface = data.get("interface", "")
-        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,32}", interface):
-          raise ValueError("Interfaz inválida")
-        command(["nmcli", "device", "disconnect", interface])
-        self.refresh_network()
-      elif action == "workspace":
-        workspace = int(number(data.get("id"), 1, 99))
-        command(["hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {workspace} }})"])
-      elif action == "screenshot":
-        self.captures.capture(data)
-      elif action == "session":
-        self.session(data.get("command"), self.store.directory)
-      elif action == "open-tool":
-        tools = {"network": ["nm-connection-editor"], "bluetooth": ["blueman-manager"],
-            "audio": ["pavucontrol"], "waypaper": ["waypaper"]}
-        argv = tools.get(data.get("name"))
-        if not argv or not shutil.which(argv[0]):
-          raise RuntimeError("Instala el editor externo para usar esta opción")
-        subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-      elif action == "waypaper-restore":
-        self.restore_waypaper()
-      elif action == "apply-window-gaps":
-        self.features.require_config(request)
-        if not self.window_gaps.sync():
-          raise RuntimeError("No se pudo aplicar la separación de ventanas; revisa el mensaje en Apariencia")
-      elif action == "apply-shortcuts":
-        self.features.require_config(request)
-        if not self.shortcut_state()["available"]:
-          raise ValueError("Carga bindings-prelude.lua antes de tus binds y hyprlarp.lua al final de hyprland.lua")
-        executable = Path(os.environ.get("HYPRLARP_EXECUTABLE", str(ROOT / "bin/hyprlarp")))
-        destination = self.store.directory / "bindings.lua"
-        previous = read_regular(destination) if destination.exists() else None
-        atomic_text(destination, generate_bindings(self.store.settings, executable))
-        try:
-          command(["hyprctl", "reload"])
-        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
-          if previous is None:
-            destination.unlink(missing_ok=True)
-          else:
-            atomic_bytes(destination, previous)
-          raise
-        self.emit("message", "Atajos aplicados; los binds existentes tienen prioridad")
-      else:
+      if not self.system_actions.handle(action, data, request):
         raise ValueError("Acción desconocida")
       self.emit("done", {"action": action})
     except (OSError, ValueError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
@@ -1062,6 +663,13 @@ class Service:
       if action in SETTINGS_ACTIONS:
         self.emit("settings-rejected", {"action": action})
         self.emit_settings()
+    except Exception as error:
+      scope = 'panel:' + self.active_panel
+      if scope in self.faults.allowed:
+        self.faults.report(scope, str(error))
+        self.emit('faults', self.faults.snapshot())
+      self.emit('action-error', {'action': action, 'message': str(error)})
+      self.emit('error', 'Falló un componente: ' + str(error))
     finally:
       self.emit("idle", {"action": action})
 
@@ -1084,9 +692,20 @@ class Service:
         config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
         directory = Path(os.environ.get("HYPRLARP_STATE_DIR", str(config_home / "hyprlarp")))
       configuration = directory / "generated-lock.conf"
-      atomic_text(configuration, render_lock_config(Store(directory).settings))
-      subprocess.Popen(["hyprlock", "--grace", "0", "--config", str(configuration)],
-              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+      if __package__:
+        from .lockscreen import prepare, monitors
+      else:
+        from lockscreen import prepare, monitors
+      settings = Store(directory).settings
+      assets, information = prepare(settings, directory)
+      descriptor = os.open(assets, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+      try:
+        atomic_text(configuration, render_lock_config(settings, outputs=monitors(),
+          asset_path=f"/proc/self/fd/{descriptor}", assets=information))
+        subprocess.Popen(["hyprlock", "--grace", "0", "--immediate-render", "--config", str(configuration)],
+          pass_fds=(descriptor,), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+      finally:
+        os.close(descriptor)
     elif name in {"poweroff", "reboot"}:
       command(["systemctl", name])
     elif name == "logout":
@@ -1094,7 +713,6 @@ class Service:
     elif name == "suspend":
       # hypridle's sleep inhibitor waits for the session-lock protocol before sleep.
       # Require our explicit config; an arbitrary idle daemon may not lock on sleep.
-      import shlex
       if directory is None:
         raise RuntimeError("No se encontró la configuración de suspensión")
       expected = str(directory / "hypridle.conf")
@@ -1107,6 +725,7 @@ class Service:
 
   def serve(self) -> None:
     self.serving = True
+    self.emit('faults', self.faults.snapshot())
     self.emit("modules", MODULE_DEFINITIONS)
     self.emit("palettes", PALETTES)
     self.features.startup()
@@ -1123,6 +742,8 @@ class Service:
     self.queue_refresh("night-light", self.night.sync)
     self.start_external_wallpaper()
     self.queue_refresh("window-gaps", lambda: self.window_gaps.sync(native=not self.settings_only))
+    if not self.preview:
+      self.queue_refresh("displays", lambda: self.displays.refresh("startup"))
     polling = threading.Thread(target=self.poll, daemon=True)
     polling.start()
     try:
@@ -1143,7 +764,7 @@ class Service:
           if request["action"] != "history" and len(line) > JSON_LIMIT:
             raise ValueError("La petición supera 2 MiB")
           # Serialize persistence; slow device operations use workers.
-          if request.get("action") in SETTINGS_ACTIONS | {"settings-context", "history", "panel", "network-status", "outputs", "profile-save", "profile-delete", "theme-save", "theme-delete", "settings-export", "bluetooth-respond", "bluetooth-cancel"}:
+          if request.get("action", "").startswith('performance-') or request.get("action") in SETTINGS_ACTIONS | {"fault-report", "fault-reset", "settings-context", "history", "panel", "network-status", "outputs", "profile-save", "profile-delete", "theme-save", "theme-delete", "settings-export", "bluetooth-respond", "bluetooth-cancel", "launcher-query"}:
             self.action(request)
           elif request.get("action") == "refresh":
             data = request.get("data", {})
@@ -1165,6 +786,7 @@ class Service:
       self.serving = False
       self.stopping.set()
       self.wakeup.set()
+      self.wallpaper_palette.close()
       stop_processes()
       self.devices.stop()
       self.bluetooth_manager.close()

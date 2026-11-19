@@ -229,8 +229,9 @@ class IntegrationParserTests(unittest.TestCase):
 
 
 class ResourceSchedulingTests(unittest.TestCase):
-  def test_native_idle_and_settings_have_no_background_poll_jobs(self):
-    self.assertEqual(poll_intervals(DEFAULTS, "", native_services=True), {})
+  def test_native_idle_only_samples_enabled_battery_alerts_and_settings_never_poll(self):
+    self.assertEqual(poll_intervals(DEFAULTS, "", native_services=True), {"battery": 30})
+    self.assertEqual(poll_intervals({**DEFAULTS, "batteryAlertsEnabled": False}, "", native_services=True), {})
     self.assertEqual(poll_intervals(DEFAULTS, "resources", settings_only=True), {})
 
   def test_metrics_only_sample_when_visible_and_clipboard_only_when_open(self):

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import "../core"
+import "." as Controls
 
 ColumnLayout {
   id: root
@@ -39,7 +40,7 @@ ColumnLayout {
     visible: !!Bridge.settings.nightLightSchedule
     Label {
       text: "Desde"
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     Field {
       text: Bridge.settings.nightLightStart || "20:00"
@@ -55,7 +56,7 @@ ColumnLayout {
     }
     Label {
       text: "Hasta"
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     Field {
       text: Bridge.settings.nightLightEnd || "07:00"
@@ -70,17 +71,14 @@ ColumnLayout {
       }
     }
   }
-  Label {
+  Controls.StatusMessage {
     text: Bridge.preview ? "Vista previa · el filtro de pantalla está desactivado." : Bridge.settingsOnly ? "Inicia el shell para aplicar el filtro." : Bridge.nightLight.error || (Bridge.nightLight.active ? "Filtro activo · " + Bridge.nightLight.temperature + " K" : NightLight.desired ? "Aplicando filtro…" : "Filtro desactivado")
-    color: Theme.muted
-    Layout.fillWidth: true
-    wrapMode: Text.WordWrap
-    font.pixelSize: 11
+    error: !Bridge.preview && !Bridge.settingsOnly && !!Bridge.nightLight.error
   }
   Label {
     text: "La temperatura baja da un tono más cálido. El horario admite cruzar medianoche; dos horas iguales mantienen el filtro todo el día."
     color: Theme.muted
-    font.pixelSize: 10
+    font.pixelSize: Theme.fontPx(10)
     wrapMode: Text.WordWrap
     Layout.fillWidth: true
   }

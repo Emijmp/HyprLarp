@@ -32,7 +32,8 @@ ColumnLayout {
       "screenshot-screen": "Capturar escritorio",
       lock: "Bloquear",
       audio: "Audio",
-      presentation: "Presentación"
+      presentation: "Presentación",
+      displays: "Pantallas y proyección"
     })
   readonly property var actions: Object.keys(Bridge.settings.shortcuts || {})
   readonly property var availableActions: actions.filter(action => !Bridge.settings.shortcuts[action])
@@ -195,7 +196,7 @@ ColumnLayout {
     Layout.fillWidth: true
     text: "Tus binds actuales tienen prioridad. Los cambios se guardan con Deshacer/Rehacer; pulsa Aplicar para activarlos."
     color: Theme.muted
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
     wrapMode: Text.WordWrap
   }
   ColumnLayout {
@@ -211,7 +212,7 @@ ColumnLayout {
         Label {
           text: root.labels[shellEntry.modelData] || shellEntry.modelData
           Layout.fillWidth: true
-          font.pixelSize: 12
+          font.pixelSize: Theme.fontPx(12)
         }
         ShortcutField {
           action: shellEntry.modelData
@@ -244,7 +245,7 @@ ColumnLayout {
       visible: root.custom.length === 0
       text: "Añade un comando, una acción del shell o personaliza un bind de Hyprland."
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
     }
@@ -272,7 +273,7 @@ ColumnLayout {
             text: customEntry.modelData.chord
             color: Theme.muted
             font.family: Theme.mono
-            font.pixelSize: 11
+            font.pixelSize: Theme.fontPx(11)
           }
           ActionButton {
             text: customEntry.modelData.enabled ? "Activo" : "Desactivado"
@@ -291,7 +292,7 @@ ColumnLayout {
         Label {
           text: customEntry.modelData.type === "inherit" ? "Conserva la acción Lua y sus opciones originales" : customEntry.modelData.type === "shell" ? root.labels[customEntry.modelData.action] : customEntry.modelData.command
           color: Theme.muted
-          font.pixelSize: 11
+          font.pixelSize: Theme.fontPx(11)
           Layout.fillWidth: true
           elide: Text.ElideRight
         }
@@ -319,7 +320,7 @@ ColumnLayout {
       Layout.fillWidth: true
       color: Theme.muted
       wrapMode: Text.WordWrap
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     ListView {
       Layout.fillWidth: true
@@ -339,7 +340,7 @@ ColumnLayout {
             text: nativeEntry.modelData.chord + (nativeEntry.modelData.submap ? " · " + nativeEntry.modelData.submap : "")
             Layout.fillWidth: true
             font.family: Theme.mono
-            font.pixelSize: 11
+            font.pixelSize: Theme.fontPx(11)
           }
           ActionButton {
             text: "Editar"
@@ -355,7 +356,7 @@ ColumnLayout {
           Layout.fillWidth: true
           elide: Text.ElideRight
           color: Theme.muted
-          font.pixelSize: 11
+          font.pixelSize: Theme.fontPx(11)
         }
         Rule {}
       }
@@ -413,7 +414,7 @@ ColumnLayout {
       color: Theme.muted
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
     }
     SettingToggle {
       visible: !!root.draft && !root.draft.builtin && root.draft.type !== "inherit"
@@ -462,7 +463,7 @@ ColumnLayout {
     color: Theme.muted
     Layout.fillWidth: true
     wrapMode: Text.WordWrap
-    font.pixelSize: 11
+    font.pixelSize: Theme.fontPx(11)
   }
   RowLayout {
     ActionButton {
@@ -483,7 +484,7 @@ ColumnLayout {
       required property var modelData
       text: modelData.chord + " · Se conserva: " + modelData.command
       color: Theme.muted
-      font.pixelSize: 11
+      font.pixelSize: Theme.fontPx(11)
       wrapMode: Text.WordWrap
       Layout.fillWidth: true
     }
