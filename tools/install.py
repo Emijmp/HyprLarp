@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 from deployment import ROOT, Locations, MARKER, commit, copy_sources, desktop_word, deployment_lock, digest, load_manifest, no_symlinks
+from backend.version import VERSION, read_version
 sys.path.insert(0, str(ROOT))
 from backend.service import Store, generate_bindings, lua_string, read_regular
 from backend.gaps import render as render_window_gaps
@@ -89,6 +90,7 @@ def _install(locations, dry_run=False):
     if not (locations.app / MARKER).is_file():
       raise ValueError('El destino ya existe sin un manifiesto de HyprLarp; se ha conservado.')
     previous = load_manifest(locations)
+  first_run = bool(previous.get('first_run', False)) if previous else not (locations.config / 'settings.json').exists()
   locations.app.parent.mkdir(parents=True, exist_ok=True)
   stage = Path(tempfile.mkdtemp(prefix='.hyprlarp-stage-', dir=locations.app.parent))
   try:
@@ -132,7 +134,8 @@ def _install(locations, dry_run=False):
     }
     contents = {role: text.encode('utf-8') for role, text in contents.items()}
     contents, managed = plan_managed(locations, contents, previous)
-    manifest = {'type': 'hyprlarp-install', 'version': 1, 'prefix': locations.prefix, 'files': files,
+    manifest = {'type': 'hyprlarp-install', 'version': 1, 'release': read_version(stage), 'first_run': first_run,
+      'prefix': locations.prefix, 'files': files,
       'managed': managed}
     locations.config.mkdir(parents=True, exist_ok=True, mode=0o700)
     locations.config.chmod(0o700)
@@ -190,6 +193,7 @@ def install(locations, dry_run=False):
 
 def main():
   parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument('--version', action='version', version='HyprLarp ' + VERSION)
   parser.add_argument('--prefix', type=Path, help='Instalación aislada; usa el mismo prefijo al desinstalar')
   parser.add_argument('--dry-run', action='store_true', help='Mostrar el plan sin escribir archivos')
   args = parser.parse_args()

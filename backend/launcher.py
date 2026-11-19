@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from collections import deque
+from heapq import nsmallest
 import math
 import operator
 import os
@@ -116,16 +117,23 @@ class LauncherSearch:
       path = Path(query).expanduser()
       folder, prefix = (path, "") if query.endswith("/") else (path.parent, normalize(path.name))
       matches = []
+      truncated = False
       try:
         with os.scandir(folder) as entries:
           for index, entry in enumerate(entries):
-            if index >= MAX_ENTRIES or not self.current(token):
+            if not self.current(token):
+              return [], False
+            if index >= MAX_ENTRIES:
+              truncated = True
               break
             if not entry.name.startswith(".") and normalize(entry.name).startswith(prefix):
               matches.append((normalize(entry.name), entry.name, entry.path, entry.is_dir()))
+              if len(matches) > MAX_RESULTS:
+                truncated = True
+                break
       except OSError:
         pass
-      return self.results(matches), len(matches) > MAX_RESULTS
+      return self.results(matches), truncated
     words = normalize(query).split()[:8]
     if not words:
       return [], False
@@ -135,8 +143,11 @@ class LauncherSearch:
       index = self.build_index(token)
     if index is None:
       return [], False
-    matches = [entry for entry in index if all(word in entry[0] for word in words)]
-    matches.sort(key=lambda item: (not item[0].startswith(words[0]), not item[3], item[0]))
+    # Only forty results can reach the view. Keep one extra to report truncation
+    # instead of allocating and sorting every matching entry on each keystroke.
+    matches = nsmallest(MAX_RESULTS + 1,
+      (entry for entry in index if all(word in entry[0] for word in words)),
+      key=lambda item: (not item[0].startswith(words[0]), not item[3], item[0]))
     return self.results(matches), self.truncated or len(matches) > MAX_RESULTS
 
   @staticmethod

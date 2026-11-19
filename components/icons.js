@@ -62,3 +62,18 @@ const paths = {
   shield: "M12 2l9 4v7c0 5-9 9-9 9s-9-4-9-9V6z M7 12l3 3 7-7",
   ethernet: "M5 2h14v12H5z M8 2v4M12 2v4M16 2v4M8 14v5H2v3M16 14v5h6v3M12 14v8"
 };
+
+// The path set is fixed; each icon retains at most one tint. Multiple buttons
+// share their SVG URI without leaving a cache entry for every color edit.
+const iconSourceCache = Object.create(null);
+function source(name, color, opacity) {
+  if (!Object.prototype.hasOwnProperty.call(paths, name))
+    name = "grid";
+  const previous = iconSourceCache[name];
+  if (previous && previous.color === color && previous.opacity === opacity)
+    return previous.uri;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="' + paths[name] + '" fill="none" stroke="' + color + '" stroke-opacity="' + opacity + '" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const uri = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  iconSourceCache[name] = {color: color, opacity: opacity, uri: uri};
+  return uri;
+}

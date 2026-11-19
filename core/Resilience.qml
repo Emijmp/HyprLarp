@@ -4,9 +4,10 @@ import Quickshell
 import Quickshell.Io
 
 Singleton {
+  readonly property var blockedModules: new Set(Bridge.faults.filter(item => item.blocked).map(item => item.id))
   signal retryRequested(string moduleId)
   function blocked(id) {
-    return Bridge.faults.some(item => item.id === id && item.blocked);
+    return blockedModules.has(id);
   }
   function report(id, message) {
     Bridge.send("fault-report", {

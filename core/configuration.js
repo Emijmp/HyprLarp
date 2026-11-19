@@ -1,5 +1,6 @@
 // Search labels mirror real settings rather than indexing instantiated controls.
 var entries = [
+  ["General", "Asistente de primera ejecución", "bienvenida primeros pasos comenzar inicio configuración inicial version hyprlarp", "setting-welcome"],
   ["General", "Rendimiento del shell", "rendimiento consumo cpu ram memoria arranque revision comparar medicion historial procesos", "setting-performance"],
   ["General", "Perfil de actividad del shell", "rendimiento optimizar eficiente equilibrado agil sondeos fondo cpu memoria efectos desenfoque animaciones", "setting-performance-mode"],
   ["General", "Accesibilidad", "escala texto tamaño letra grande alto contraste movimiento teclado tab foco lector pantalla orca at-spi", "setting-accessibility"],

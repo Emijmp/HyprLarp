@@ -65,10 +65,14 @@ try:
   from .settings_schema import ROOT, MODULE_DEFINITIONS, MODULES, PANELS, PALETTES, THEMES, COLOR_ROLES, SETTINGS_ACTIONS, SETTINGS_HISTORY_LIMIT, NOTIFICATION_JSON_LIMIT, DEFAULTS, COMMAND_PROFILE, number, validate_setting, migrate_settings, shortcut_key, geometry_minimum, validate_geometry
   from .persistence import atomic_bytes, atomic_text, atomic_json
   from .settings_store import Store as SettingsStore
+  from .onboarding import Onboarding
+  from .version import VERSION
 except ImportError:
   from settings_schema import ROOT, MODULE_DEFINITIONS, MODULES, PANELS, PALETTES, THEMES, COLOR_ROLES, SETTINGS_ACTIONS, SETTINGS_HISTORY_LIMIT, NOTIFICATION_JSON_LIMIT, DEFAULTS, COMMAND_PROFILE, number, validate_setting, migrate_settings, shortcut_key, geometry_minimum, validate_geometry
   from persistence import atomic_bytes, atomic_text, atomic_json
   from settings_store import Store as SettingsStore
+  from onboarding import Onboarding
+  from version import VERSION
 
 
 class Store(SettingsStore):
@@ -192,6 +196,7 @@ def generate_bindings(settings: dict, executable: Path) -> str:
 class Service:
   def __init__(self, store: Store, preview: bool = False, settings_only: bool = False, native_services: bool = False):
     self.store, self.preview, self.settings_only = store, preview, settings_only
+    self.onboarding = Onboarding(store.directory, ROOT, automatic=not preview and not settings_only)
     self.native_services = native_services
     self.serving = False
     self.output_lock = threading.Lock()
@@ -243,7 +248,7 @@ class Service:
   def emit(self, kind: str, data: Any) -> None:
     with self.output_lock:
       try:
-        print(json.dumps({"type": kind, "data": data}, ensure_ascii=False), flush=True)
+        print(json.dumps({"type": kind, "data": data}, ensure_ascii=False, separators=(",", ":")), flush=True)
       except (BrokenPipeError, OSError):
         self.stopping.set()
         self.wakeup.set()
@@ -412,7 +417,6 @@ class Service:
 
   def poll(self) -> None:
     due, previous = {}, {}
-    self.refresh_system(battery=True)
     while not self.stopping.is_set():
       self.wakeup.clear()
       plan = self.polling_plan()
@@ -459,9 +463,7 @@ class Service:
     if action != "settings" and (not self.configuration_focused or source != "config"):
       raise ValueError("Abre y enfoca la configuración para deshacer, rehacer o restablecer")
     previous_warning = self.store.warning
-    previous_directory = self.store.settings["wallpaperDirectory"]
-    previous_provider = self.store.settings["wallpaperProvider"]
-    previous_gaps = window_gaps_values(self.store.settings)
+    previous = self.store.settings
     if action == "settings":
       self.store.update(data, record=source == "config")
     elif action == "settings-undo":
@@ -477,14 +479,20 @@ class Service:
       self.store.update(self.features.settings_updates(action, data))
     if self.store.warning and self.store.warning != previous_warning:
       self.emit("error", self.store.warning)
-    self.safe_refresh(self.sync_watchers)
-    self.safe_refresh(self.sync_hardware)
-    if self.serving:
+    # Store publishes a new settings object after a successful commit. The old
+    # object stays intact, including across undo, reset and profile restores.
+    changed = {key for key in self.store.settings if previous[key] != self.store.settings[key]}
+    if changed & {"clipboardEnabled", "clipboardPaused"}:
+      self.safe_refresh(self.sync_watchers)
+    if changed & {"barEnabled", "barModules", "disabledModules", "monitorBars", "osdEnabled"}:
+      self.safe_refresh(self.sync_hardware)
+    if self.serving and changed & {"nightLightEnabled", "nightLightTemperature", "nightLightSchedule", "nightLightStart", "nightLightEnd"}:
       self.queue_refresh("night-light", self.night.sync, latest=True)
-    self.wakeup.set()
-    if previous_directory != self.store.settings["wallpaperDirectory"] or previous_provider != self.store.settings["wallpaperProvider"]:
+    if changed & {"barEnabled", "barModules", "disabledModules", "monitorBars", "batteryAlertsEnabled", "clipboardEnabled", "clipboardRetentionHours", "performanceMode"}:
+      self.wakeup.set()
+    if changed & {"wallpaperDirectory", "wallpaperProvider"}:
       self.queue_refresh("wallpapers", self.refresh_wallpapers, latest=True)
-    if previous_gaps != window_gaps_values(self.store.settings):
+    if changed & {"windowGapsEnabled", "windowGapsIn", "windowGapsOut"}:
       self.queue_refresh("window-gaps", self.window_gaps.sync, latest=True)
     self.emit_settings()
 
@@ -494,6 +502,17 @@ class Service:
     try:
       if action != "history" and not isinstance(data, dict):
         raise ValueError("Los datos de la acción deben ser un objeto")
+      if action in {"onboarding-complete", "onboarding-skip"}:
+        self.onboarding.ensure_writable()
+        if action == "onboarding-complete":
+          updates = self.onboarding.updates(data)
+          self.edit_settings("settings", updates, "config")
+        elif data:
+          raise ValueError("Omitir el asistente no admite cambios de configuración")
+        self.onboarding.finish("completed" if action == "onboarding-complete" else "skipped", VERSION)
+        self.emit("onboarding", self.onboarding.snapshot())
+        self.emit("done", {"action": action})
+        return
       if action == 'fault-report':
         self.faults.report(data.get('id'), data.get('message'))
         self.emit('faults', self.faults.snapshot())
@@ -725,6 +744,8 @@ class Service:
 
   def serve(self) -> None:
     self.serving = True
+    self.emit("version", VERSION)
+    self.emit("onboarding", self.onboarding.snapshot())
     self.emit('faults', self.faults.snapshot())
     self.emit("modules", MODULE_DEFINITIONS)
     self.emit("palettes", PALETTES)
@@ -764,7 +785,7 @@ class Service:
           if request["action"] != "history" and len(line) > JSON_LIMIT:
             raise ValueError("La petición supera 2 MiB")
           # Serialize persistence; slow device operations use workers.
-          if request.get("action", "").startswith('performance-') or request.get("action") in SETTINGS_ACTIONS | {"fault-report", "fault-reset", "settings-context", "history", "panel", "network-status", "outputs", "profile-save", "profile-delete", "theme-save", "theme-delete", "settings-export", "bluetooth-respond", "bluetooth-cancel", "launcher-query"}:
+          if request.get("action", "").startswith('performance-') or request.get("action") in SETTINGS_ACTIONS | {"onboarding-complete", "onboarding-skip", "fault-report", "fault-reset", "settings-context", "history", "panel", "network-status", "outputs", "profile-save", "profile-delete", "theme-save", "theme-delete", "settings-export", "bluetooth-respond", "bluetooth-cancel", "launcher-query"}:
             self.action(request)
           elif request.get("action") == "refresh":
             data = request.get("data", {})
@@ -805,6 +826,7 @@ def main() -> None:
   signal.signal(signal.SIGTERM, terminate)
   os.umask(0o077)
   parser = argparse.ArgumentParser()
+  parser.add_argument("--version", action="version", version="HyprLarp " + VERSION)
   parser.add_argument("--preview", action="store_true")
   parser.add_argument("--settings-only", action="store_true")
   parser.add_argument("--native-services", action="store_true")

@@ -481,6 +481,12 @@ Scope {
   Loader {
     id: accessibilityChecks
     onLoaded: item.completed.connect(() => {
+      welcomeChecks.setSource(Qt.resolvedUrl("WelcomeChecks.qml"));
+    })
+  }
+  Loader {
+    id: welcomeChecks
+    onLoaded: item.completed.connect(() => {
       console.log("SMOKE COMPLETE");
       Qt.quit();
     })

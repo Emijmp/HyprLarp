@@ -18,8 +18,10 @@ from urllib.parse import unquote, urlsplit
 
 try:
   from .theme_context import effective_name, resolve as resolve_theme
+  from .version import VERSION
 except ImportError:
   from theme_context import effective_name, resolve as resolve_theme
+  from version import VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = Path('/usr/bin/noctalia-greeter-apply-appearance')
@@ -353,6 +355,7 @@ def sync(settings_path, waypaper, *, force=False):
 def main():
   config = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
   parser = argparse.ArgumentParser(description='Sincroniza el greeter de greetd con HyprLarp')
+  parser.add_argument('--version', action='version', version='HyprLarp Greeter ' + VERSION)
   parser.add_argument('command', choices=['sync', 'export', 'status', 'preview', 'uninstall'])
   parser.add_argument('--settings', type=Path, default=config / 'hyprlarp/settings.json')
   parser.add_argument('--waypaper', type=Path, default=config / 'waypaper/config.ini')

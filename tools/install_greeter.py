@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT))
 from backend.greeter import DEFAULT_GREETER, HELPER, GREETER_STATE, GREETER_UI, PREFERENCES, atomic_write, dump_toml
+from backend.version import VERSION
 from tools.greeter_lifecycle import Snapshot, locked, fingerprint
 
 UNIT = 'hyprlarp-greeter-sync'
@@ -30,7 +31,7 @@ SYNC_FILES = ['backend/greeter.py', 'backend/theme_context.py', 'config/palettes
   'tools/install_greeter.py', 'tools/greeter_lifecycle.py']
 UI_FILES = ['greeter/' + name for name in ['shell.qml', 'BrandIcon.qml', 'ControlButton.qml', 'Controller.qml',
   'GreeterView.qml', 'SessionChoice.qml', 'model.py', 'branding.js']] + ['assets/' + name for name in
-  ['hyprlarp.svg', 'error.svg', 'application.svg']]
+  ['hyprlarp.svg', 'error.svg', 'application.svg']] + ['VERSION', 'backend/__init__.py', 'backend/version.py']
 SYNC_FILES += UI_FILES
 DYNAMIC_APPEARANCE = {'theme_mode', 'corner_radius_scale', 'font_family', 'palette', 'wallpaper', 'wallpapers'}
 UI_LAUNCHER = Path('/usr/local/libexec/hyprlarp-greeter-ui')
@@ -93,24 +94,16 @@ def install_ui(backup, stamp):
   stage = Path(tempfile.mkdtemp(prefix='.hyprlarp-greeter-ui-', dir=GREETER_UI.parent))
   try:
     stage.chmod(0o755)
-    (stage / 'greeter').mkdir(mode=0o755)
-    (stage / 'greeter').chmod(0o755)
-    (stage / 'assets').mkdir(mode=0o755)
-    (stage / 'assets').chmod(0o755)
-    files = list((ROOT / 'greeter').glob('*.qml')) + [ROOT / 'greeter/model.py', ROOT / 'greeter/branding.js']
-    if not any(path.name == 'shell.qml' for path in files):
+    for name in ['greeter', 'assets', 'backend']:
+      (stage / name).mkdir(mode=0o755)
+      (stage / name).chmod(0o755)
+    if not (ROOT / 'greeter/shell.qml').is_file():
       raise ValueError('Falta la interfaz de HyprLarp Greeter en el paquete')
-    for source in files:
+    for relative in UI_FILES:
+      source = ROOT / relative
       if source.is_symlink() or not source.is_file():
         raise ValueError('Archivo de interfaz no válido: ' + str(source))
-      destination = stage / 'greeter' / source.name
-      shutil.copyfile(source, destination)
-      destination.chmod(0o644)
-    for name in ['hyprlarp.svg', 'error.svg', 'application.svg']:
-      source = ROOT / 'assets' / name
-      if source.is_symlink() or not source.is_file():
-        raise ValueError('Recurso de identidad no válido: ' + str(source))
-      destination = stage / 'assets' / name
+      destination = stage / relative
       shutil.copyfile(source, destination)
       destination.chmod(0o644)
     if GREETER_UI.exists():
@@ -424,7 +417,7 @@ def system_setup(username):
         atomic_write(GREETD, dump_toml(current_greetd).encode())
         GREETD.chmod(0o644)
       run(['/usr/bin/noctalia-greeter', 'passwordless-sync', 'enable', username])
-      result = {'type': 'hyprlarp-greeter-system', 'version': 1, 'user': username,
+      result = {'type': 'hyprlarp-greeter-system', 'version': 1, 'release': VERSION, 'user': username,
         'baseline': str(baseline), 'owned': str(directory / 'owned'), 'previous_authorization': authorized,
         'legacy_backup': manifest.get('legacy_backup') if manifest else legacy,
         'installed': True, 'pending': True, 'operation': token, 'expected': str(directory / 'expected')}
@@ -736,7 +729,7 @@ def install_user(*, dry_run=False):
     try:
       stop_units()
       setup = privileged('--system', username)
-      document = {'type': 'hyprlarp-greeter-user', 'version': 1, 'user': username,
+      document = {'type': 'hyprlarp-greeter-user', 'version': 1, 'release': VERSION, 'user': username,
         'baseline': str(baseline), 'owned': str(directory / 'owned'), 'previous_units': original_units,
         'setup': setup}
       atomic_write(stage / 'installation.json', (json.dumps(document, indent=2) + '\n').encode())
@@ -855,6 +848,7 @@ def uninstall_user(*, dry_run=False):
 
 def main():
   parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument('--version', action='version', version='HyprLarp Greeter ' + VERSION)
   parser.add_argument('--dry-run', action='store_true')
   parser.add_argument('--uninstall', action='store_true', help='Restaurar el greeter anterior y retirar la integración opcional')
   modes = parser.add_mutually_exclusive_group()

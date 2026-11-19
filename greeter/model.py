@@ -16,6 +16,9 @@ import sys
 import time
 import tomllib
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from backend.version import VERSION
+
 PREFERENCES = Path('/var/lib/hyprlarp-greeter/preferences/layout.json')
 FALLBACK = {
   'background': '#000000', 'surface': '#000000', 'raised': '#101010', 'border': '#ffffff',
@@ -200,12 +203,15 @@ def load(state, preferences=None):
   preferences = preferences or Path(os.environ.get('HYPRLARP_GREETER_PREFERENCES', PREFERENCES))
   look['layout'] = read_layout(preferences)
   look.update(read_accessibility(preferences))
-  return {'appearance': look, 'users': users(), 'sessions': entries,
+  return {'version': VERSION, 'appearance': look, 'users': users(), 'sessions': entries,
     'default_user': configuration.get('user', {}).get('default', ''), 'default_session': default_session,
     'hostname': socket.gethostname(), 'revision': hashlib.sha256(json.dumps(look, sort_keys=True).encode()).hexdigest()}
 
 
 if __name__ == '__main__':
+  if '--version' in sys.argv:
+    print('HyprLarp Greeter ' + VERSION)
+    raise SystemExit(0)
   state = Path(os.environ.get('HYPRLARP_GREETER_STATE_DIR', '/var/lib/noctalia-greeter'))
   try:
     if '--keyboard-watch' in sys.argv:

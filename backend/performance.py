@@ -118,7 +118,7 @@ class ProcessSampler:
 def package_revision(root):
   """Stable package identity without git, subprocesses or a background watcher."""
   def relevant(name):
-    return name.split('/')[0] in {'backend', 'bin', 'config', 'components', 'core', 'panels', 'widgets', 'assets', 'greeter'} or name in {'HyprLarp.qml', 'shell.qml', 'preview.qml', 'settings.qml', 'recovery.qml'}
+    return name.split('/')[0] in {'backend', 'bin', 'config', 'components', 'core', 'panels', 'widgets', 'assets', 'greeter'} or name in {'VERSION', 'HyprLarp.qml', 'shell.qml', 'preview.qml', 'settings.qml', 'recovery.qml'}
   try:
     manifest = read_json(root / '.hyprlarp-install.json', limit=4 * MIB)
     entries = {name: value for name, value in manifest['files'].items() if relevant(name)}

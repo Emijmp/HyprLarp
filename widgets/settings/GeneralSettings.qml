@@ -6,6 +6,22 @@ import "." as SettingsControls
 
 ColumnLayout {
   spacing: 18
+  SectionTitle {
+    objectName: "setting-welcome"
+    text: "HyprLarp" + (Bridge.releaseVersion ? " · " + Bridge.releaseVersion : "")
+  }
+  Label {
+    Layout.fillWidth: true
+    wrapMode: Text.WordWrap
+    color: Theme.muted
+    text: "El asistente permite elegir la apariencia, el panel y la comodidad de lectura. Revisa los cambios antes de aplicarlos."
+  }
+  ActionButton {
+    text: "Abrir asistente de primera ejecución"
+    enabled: Bridge.ready && Bridge.connected
+    onClicked: ShellState.openWelcome()
+  }
+  Rule {}
   SettingsControls.AccessibilitySettings {
     Layout.fillWidth: true
   }

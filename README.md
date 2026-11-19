@@ -29,6 +29,12 @@ En Apariencia también puedes extraer localmente colores del fondo para usarlos 
 
 El [panel de rendimiento](docs/performance-panel.md), en **General → Rendimiento del shell** o `> rendimiento` en el launcher, muestra CPU, memoria RSS/PSS, gráficos, arranque y carga de paneles. Permite guardar mediciones y comparar revisiones del paquete. El muestreo se detiene al cerrar el panel.
 
+La [optimización verificada](docs/optimization-2026-11-19.md) reduce trabajo repetido en lecturas de batería, iconos, contraste, búsquedas, guardado del historial y sincronización de ajustes, conservando las funciones y la apariencia.
+
+El [asistente de primera ejecución](docs/first-run.md) ayuda a elegir tema, diseño del panel, posición de la barra, rendimiento y accesibilidad, con vista previa y revisión antes de aplicar. Se ofrece automáticamente en instalaciones nuevas; puedes volver a abrirlo desde **Configuración → General** o con `hyprlarp welcome`.
+
+El shell, el backend y el greeter comparten una [versión de publicación](docs/versioning.md) definida en `VERSION`. Consulta `hyprlarp --version` o `hyprlarp-greeter --version` sin necesitar una sesión gráfica.
+
 Para iniciar el shell real desde este checkout:
 
 ```sh

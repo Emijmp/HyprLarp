@@ -28,8 +28,8 @@ def runtime() -> str:
   raise RuntimeError("Instala Quickshell 0.3.2+ antes de iniciar HyprLarp")
 
 
-def ipc(binary: str, method: str, *arguments: str, quiet: bool = False) -> bool:
-  result = subprocess.run([binary, "--path", str(ROOT / "shell.qml"), "ipc", "call", "shell", method, *arguments],
+def ipc(binary: str, method: str, *arguments: str, quiet: bool = False, entrypoint: str = "shell.qml") -> bool:
+  result = subprocess.run([binary, "--path", str(ROOT / entrypoint), "ipc", "call", "shell", method, *arguments],
               capture_output=True, text=True)
   if result.returncode and result.stderr and not quiet:
     print(result.stderr.strip(), file=sys.stderr)
@@ -50,8 +50,11 @@ def doctor(*, json_output=False, report_path=None, include_logs=True) -> int:
 
 
 def main() -> int:
+  sys.path.insert(0, str(ROOT))
+  from backend.version import VERSION
   parser = argparse.ArgumentParser(description="HyprLarp · shell para Hyprland")
-  parser.add_argument("command", nargs="?", default="run", choices=["run", "start", "stop", "ready", "session-check", "recover", "retry", "preview", "settings", "toggle", "close", "lock", "screenshot-region", "screenshot-region-frozen", "screenshot-screen", "screenshot-window", "doctor", "install", "uninstall"])
+  parser.add_argument("--version", action="version", version="HyprLarp " + VERSION)
+  parser.add_argument("command", nargs="?", default="run", choices=["run", "start", "stop", "ready", "session-check", "recover", "retry", "preview", "settings", "welcome", "toggle", "close", "lock", "screenshot-region", "screenshot-region-frozen", "screenshot-screen", "screenshot-window", "doctor", "install", "uninstall"])
   parser.add_argument("panel", nargs="?", choices=sorted(PANELS))
   parser.add_argument("--dry-run", action="store_true", help="Mostrar los archivos de instalación")
   parser.add_argument("--prefix", type=Path, help="Directorio de una instalación aislada")
@@ -108,10 +111,16 @@ def main() -> int:
       from backend.supervisor import supervise
       return supervise(ROOT, binary, environment)
     os.execvpe(binary, [binary, "--path", str(entrypoint), "--no-duplicate"], environment)
-  if args.command == "settings":
-    if ipc(binary, "settings", quiet=True):
+  if args.command in {"settings", "welcome"}:
+    if ipc(binary, args.command, quiet=True):
+      return 0
+    if ipc(binary, args.command, quiet=True, entrypoint="settings.qml"):
       return 0
     environment["HYPRLARP_SETTINGS_ONLY"] = "1"
+    if args.command == "welcome":
+      environment["HYPRLARP_WELCOME_ONLY"] = "1"
+    else:
+      environment.pop("HYPRLARP_WELCOME_ONLY", None)
     os.execvpe(binary, [binary, "--path", str(ROOT / "settings.qml"), "--no-duplicate"], environment)
   if args.command == "toggle":
     if not args.panel:

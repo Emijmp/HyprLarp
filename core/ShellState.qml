@@ -6,7 +6,9 @@ Singleton {
   id: root
   property string panel: Bridge.preview ? (Quickshell.env("HYPRLARP_START_PANEL") ?? "control") : ""
   property double panelRequestedAt: 0
-  property bool settingsOpen: Bridge.settingsOnly
+  property bool settingsOpen: Bridge.settingsOnly && Quickshell.env("HYPRLARP_WELCOME_ONLY") !== "1"
+  property bool welcomeOpen: Quickshell.env("HYPRLARP_WELCOME_ONLY") === "1"
+  property bool welcomeOffered: false
   property var activeScreen: null
   readonly property bool vertical: ["left", "right"].indexOf(Bridge.settings.barPosition) !== -1
   property string settingsPage: "Appearance"
@@ -14,6 +16,16 @@ Singleton {
   property string sessionRequest: ""
   signal settingsRequested(string page)
   signal sessionRequested(string command)
+  function openWelcome() {
+    Bridge.flush(true);
+    welcomeOffered = true;
+    panel = "";
+    welcomeOpen = true;
+  }
+  function offerWelcome() {
+    if (Bridge.ready && Bridge.connected && !Bridge.preview && !Bridge.settingsOnly && Bridge.onboarding.needed && !welcomeOffered)
+      openWelcome();
+  }
   function browseWallpaperDirectory() {
     wallpaperDirectoryRequested = true;
     openSettings("Wallpapers");
@@ -74,8 +86,16 @@ Singleton {
   Connections {
     target: Bridge
     function onReadyChanged() {
-      if (Bridge.ready)
+      if (Bridge.ready) {
         root.syncPanel();
+        Qt.callLater(root.offerWelcome);
+      }
+    }
+    function onOnboardingChanged() {
+      Qt.callLater(root.offerWelcome);
+    }
+    function onConnectedChanged() {
+      Qt.callLater(root.offerWelcome);
     }
   }
   property int captureRemaining: 0

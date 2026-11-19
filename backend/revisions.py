@@ -186,7 +186,10 @@ class Revisions:
   def save(self, before, settings, undo, redo, *, capture=True, label="Configuración"):
     if self.read_only:
       raise ValueError("El historial usa una versión posterior; se conserva sin modificar")
-    document = copy.deepcopy(self.document)
+    # Stored snapshots are immutable internally. Copy the containers we append
+    # or trim, rather than cloning up to thirty complete configurations on
+    # every edit. New snapshots and undo/redo still own their nested values.
+    document = {**self.document, "revisions": list(self.document["revisions"])}
     versions = document["revisions"]
     for value, title in ((before, "Antes del cambio"), (settings, label)) if capture else ():
       value = portable(value)

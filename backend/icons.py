@@ -1,8 +1,12 @@
 """Resolve an installed icon theme once at startup, including plain Wayland sessions."""
 
 import configparser
+from itertools import product
 import os
 from pathlib import Path
+
+ICON_SUFFIXES = tuple("." + "".join(letters) for extension in ("svg", "png", "xpm")
+  for letters in product(*[(letter, letter.upper()) for letter in extension]))
 
 
 def choose_icon_theme(environment: dict) -> str:
@@ -73,11 +77,27 @@ class IconResolver:
       self.cache[name] = path.as_uri() if valid else ""
     names = {name for name in names if name and len(name) <= 256 and "/" not in name and "\\" not in name and "\0" not in name}
     remaining = names - self.cache.keys()
-    # Scan each directory once for the whole batch, avoiding names × directories stats.
+    # Listing a whole theme is worthwhile for large batches, but a few missing
+    # names otherwise walk thousands of unrelated icons in every size/theme.
+    # Once only a small tail remains, fixed candidate probes are much cheaper.
     for folder in self.folders + self.pixmaps:
       if not remaining:
         break
       found = {}
+      if len(remaining) == 1:
+        prefix = str(folder) + os.sep
+        for name in remaining:
+          candidates = ([name] if name.rpartition(".")[2].lower() in {"svg", "png", "xpm"} else [])
+          candidates += [name + suffix for suffix in ICON_SUFFIXES]
+          for candidate in candidates:
+            path = prefix + candidate
+            if os.path.isfile(path):
+              found[name] = path
+              break
+        for name, path in found.items():
+          self.cache[name] = Path(path).absolute().as_uri()
+        remaining.difference_update(found)
+        continue
       try:
         with os.scandir(folder) as entries:
           for entry in entries:

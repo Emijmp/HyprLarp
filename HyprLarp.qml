@@ -32,7 +32,7 @@ ShellRoot {
     }
   }
   function finishStandaloneSettings() {
-    if (quitAfterSaving && (!Bridge.connected || (!Bridge.saving && !Bridge.queuedSettingsOperation && !Bridge.hasPendingSettings)))
+    if (quitAfterSaving && !ShellState.settingsOpen && !ShellState.welcomeOpen && (!Bridge.connected || (!Bridge.saving && !Bridge.queuedSettingsOperation && !Bridge.hasPendingSettings && !Bridge.isBusyGroup("onboarding-"))))
       Qt.quit();
   }
   Connections {
@@ -50,11 +50,15 @@ ShellRoot {
     function onReadyChanged() {
       Qt.callLater(root.syncContextTheme);
     }
+    function onBusyActionsChanged() {
+      root.finishStandaloneSettings();
+    }
   }
   IpcHandler {
     target: "shell"
     function health(): string {
       return JSON.stringify({
+        version: Bridge.releaseVersion,
         ready: Bridge.ready,
         connected: Bridge.connected,
         backendPid: Bridge.backendPid,
@@ -75,6 +79,9 @@ ShellRoot {
     }
     function settings(): void {
       ShellState.open("settings");
+    }
+    function welcome(): void {
+      ShellState.openWelcome();
     }
     function close(): void {
       ShellState.close();
@@ -136,6 +143,32 @@ ShellRoot {
       }
       SettingsContent {
         anchors.fill: parent
+      }
+    }
+  }
+  LazyLoader {
+    active: Bridge.ready && ShellState.welcomeOpen
+    component: FloatingWindow {
+      title: "HyprLarp · Primeros pasos"
+      implicitWidth: 900
+      implicitHeight: 740
+      minimumSize: Qt.size(640, 480)
+      color: Theme.surface
+      onVisibleChanged: if (!visible)
+        ShellState.welcomeOpen = false
+      WelcomeContent {
+        anchors.fill: parent
+        onFinished: ShellState.welcomeOpen = false
+        onCloseRequested: ShellState.welcomeOpen = false
+      }
+    }
+  }
+  Connections {
+    target: ShellState
+    function onWelcomeOpenChanged() {
+      if (!ShellState.welcomeOpen && Bridge.settingsOnly && !ShellState.settingsOpen) {
+        root.quitAfterSaving = true;
+        root.finishStandaloneSettings();
       }
     }
   }

@@ -4,14 +4,31 @@ from pathlib import Path
 import math
 
 
+def device_properties(device):
+  """Read one bounded device snapshot; individual attributes remain fallbacks."""
+  try:
+    with (device / "uevent").open() as source:
+      content = source.read(65537)
+    if len(content) > 65536:
+      return {}
+    return {key.removeprefix("POWER_SUPPLY_").lower(): value.strip()
+      for line in content.splitlines() if line.startswith("POWER_SUPPLY_") and "=" in line
+      for key, value in [line.split("=", 1)]}
+  except (OSError, UnicodeError):
+    return {}
+
+
 def battery_state(base=Path("/sys/class/power_supply")):
   batteries, external = [], []
   for device in sorted(base.glob("*")):
+    properties = device_properties(device)
     def text(name, fallback=None):
-      try:
-        return (device / name).read_text().strip() or fallback
-      except OSError:
-        return fallback
+      if name not in properties:
+        try:
+          properties[name] = (device / name).read_text().strip()
+        except OSError:
+          properties[name] = None
+      return properties[name] or fallback
 
     def number(name):
       try:
@@ -22,15 +39,17 @@ def battery_state(base=Path("/sys/class/power_supply")):
 
     kind = text("type")
     if kind in {"Mains", "USB", "USB_C", "USB_PD", "USB_DCP"}:
-      if number("online") is not None:
-        external.append(number("online") == 1)
+      online = number("online")
+      if online is not None:
+        external.append(online == 1)
       continue
     if kind != "Battery" or text("present") == "0":
       continue
     voltage = number("voltage_now")
-    design_voltage = number("voltage_min_design") or voltage
     energy = {name: number("energy_" + name) for name in ("now", "full", "full_design")}
-    charge = {name: number("charge_" + name) for name in ("now", "full", "full_design")}
+    charge_health = energy["full"] is None or energy["full_design"] is None or energy["full_design"] <= 0
+    charge = {name: number("charge_" + name) if energy[name] is None or (charge_health and name != "now") else None for name in energy}
+    design_voltage = (number("voltage_min_design") or voltage) if any(value is not None for value in charge.values()) else None
     capacity_estimated = False
     for key in energy:
       if energy[key] is None and charge[key] is not None and design_voltage:
@@ -44,8 +63,10 @@ def battery_state(base=Path("/sys/class/power_supply")):
     if percent is None and now is not None and full and full > 0:
       percent = 100 * now / full
     power = number("power_now")
-    if power is None and number("current_now") is not None and voltage is not None:
-      power = abs(number("current_now") * voltage) / 1_000_000
+    if power is None and voltage is not None:
+      current = number("current_now")
+      if current is not None:
+        power = abs(current * voltage) / 1_000_000
     watts = abs(power) / 1_000_000 if power is not None else None
     status = text("status", "Unknown")
     empty, remaining = number("time_to_empty_now"), number("time_to_full_now")

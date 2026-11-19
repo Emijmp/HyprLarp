@@ -16,9 +16,11 @@ import sys
 try:
   from .persistence import atomic_json
   from .safety import bounded_process, read_json
+  from .version import VERSION
 except ImportError:
   from persistence import atomic_json
   from safety import bounded_process, read_json
+  from version import VERSION
 
 REQUIRED = {"quickshell": "Interfaz", "hyprctl": "Hyprland"}
 OPTIONAL = {"nmcli": "Wi-Fi", "bluetoothctl": "Bluetooth", "wpctl": "Audio", "brightnessctl": "Brillo",
@@ -49,7 +51,7 @@ def collect(root, *, directory=None, include_logs=True):
   directory = Path(directory or os.environ.get("HYPRLARP_STATE_DIR", config / "hyprlarp"))
   checks = [{"id": "python", "name": "Python", "required": True,
     "status": "ok" if sys.version_info >= (3, 11) else "error", "detail": platform.python_version() + " · mínimo 3.11"}]
-  versions = {}
+  versions = {"HyprLarp": VERSION}
   for name, purpose in {**REQUIRED, **OPTIONAL}.items():
     path = shutil.which(name) or (shutil.which("qs") if name == "quickshell" else None)
     required = name in REQUIRED

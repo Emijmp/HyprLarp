@@ -16,7 +16,7 @@ from backend.service import atomic_bytes, read_json
 
 MARKER = ".hyprlarp-install.json"
 DIRECTORIES = {"assets", "backend", "bin", "components", "config", "core", "panels", "widgets", "tools", "tests", "docs", "greeter"}
-FILES = {"HyprLarp.qml", "shell.qml", "recovery.qml", "accessibility-check.qml", "resilience-check.qml", "performance-check.qml", "visual-check.qml", "preview.qml", "settings.qml", "native-types.qml", "README.md", "LICENSE", "Makefile", "install.sh", "uninstall.sh", ".editorconfig", ".qmlformat.ini"}
+FILES = {"VERSION", "HyprLarp.qml", "shell.qml", "recovery.qml", "accessibility-check.qml", "resilience-check.qml", "performance-check.qml", "visual-check.qml", "preview.qml", "settings.qml", "native-types.qml", "README.md", "LICENSE", "Makefile", "install.sh", "uninstall.sh", ".editorconfig", ".qmlformat.ini"}
 SUFFIXES = {".qml", ".py", ".js", ".json", ".lua", ".svg", ".png", ".wav", ".md", ".sh", ".conf"}
 
 

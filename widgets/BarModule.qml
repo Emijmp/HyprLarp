@@ -66,7 +66,7 @@ Item {
   readonly property real naturalWidth: (moduleName === "clock" ? 0 : guide.iconSize) + (caption !== "" ? Math.ceil(captionMetrics.advanceWidth) + 2 + (moduleName === "clock" ? 0 : 6) : 0) + (moduleName === "notifications" && Notices.unread > 0 ? Math.ceil(badgeMetrics.advanceWidth) + 8 : 0)
   opacity: Theme.opacityFor(moduleName, configuration)
   implicitWidth: Math.max(Theme.largeTargets ? 44 : 0, 2 * paddingX + (vertical ? Math.max(guide.iconSize, workspaceCell) : moduleName === "workspaces" ? workspaceWidth : Math.min(moduleName === "media" ? 200 : 400, naturalWidth)))
-  readonly property string verticalClock: Clock.timeText.replace(/[: ]/g, "\n")
+  readonly property string verticalClock: moduleName === "clock" && vertical ? Clock.timeText.replace(/[: ]/g, "\n") : ""
   implicitHeight: 2 * paddingY + (vertical && moduleName === "workspaces" ? workspaceEntries.length * workspaceCell + Math.max(0, workspaceEntries.length - 1) * 5 : vertical && moduleName === "clock" ? verticalClock.split("\n").length * (guide.fontSize + 4) : Math.max(guide.iconSize, guide.fontSize + 4))
   function cellWidth(workspace) {
     return Math.max(workspaceCell, Math.ceil(Math.min(workspace.label.length, 12) * guide.fontSize * 0.65) + 8);
@@ -79,7 +79,7 @@ Item {
   }
   TextMetrics {
     id: badgeMetrics
-    text: String(Notices.unread)
+    text: root.moduleName === "notifications" ? String(Notices.unread) : ""
     font.family: Theme.mono
     font.pixelSize: guide.fontSize
   }

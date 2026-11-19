@@ -1,14 +1,17 @@
+function linearChannel(hex, offset) {
+  const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+  return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4);
+}
 function luminance(hex) {
-  const channels = [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255);
-  return channels.map(value => value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4))
-    .reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
+  return linearChannel(hex, 1) * .2126 + linearChannel(hex, 3) * .7152 + linearChannel(hex, 5) * .0722;
 }
 function contrast(a, b) {
   const first = luminance(a), second = luminance(b);
   return (Math.max(first, second) + .05) / (Math.min(first, second) + .05);
 }
 function contrastText(background) {
-  return contrast("#000000", background) >= contrast("#ffffff", background) ? "#000000" : "#ffffff";
+  const value = luminance(background) + .05;
+  return value / .05 >= 1.05 / value ? "#000000" : "#ffffff";
 }
 function ensureContrast(color, backgrounds, ratio) {
   color = /^#[0-9a-f]{6}$/i.test(String(color)) ? String(color).toLowerCase() : "#ffffff";
@@ -16,13 +19,23 @@ function ensureContrast(color, backgrounds, ratio) {
   if (!surfaces.length)
     return color;
   ratio = ratio || 4.5;
-  const score = candidate => Math.min(...surfaces.map(surface => contrast(candidate, String(surface))));
-  if (score(color) >= ratio)
+  // Every candidate is compared with the same surfaces. Convert those only
+  // once, rather than repeating their gamma conversion throughout the search.
+  const surfaceLuminances = surfaces.map(surface => luminance(String(surface)));
+  const score = candidate => {
+    const value = luminance(candidate);
+    let minimum = Infinity;
+    for (const surface of surfaceLuminances)
+      minimum = Math.min(minimum, (Math.max(value, surface) + .05) / (Math.min(value, surface) + .05));
+    return minimum;
+  };
+  const initialScore = score(color);
+  if (initialScore >= ratio)
     return color;
   const channels = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16));
   const mix = (end, amount) => "#" + channels.map(value => Math.round(value + (end - value) * amount).toString(16).padStart(2, "0")).join("");
   let best = color;
-  let bestScore = score(color);
+  let bestScore = initialScore;
   let closest = Infinity;
   for (const end of [0, 255]) {
     const edge = mix(end, 1);

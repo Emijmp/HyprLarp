@@ -83,6 +83,20 @@ def terminate(child, timeout=8):
     child.wait(timeout=3)
 
 
+def notify_exit(child, event):
+  """Wake only for this child, leaving reaping and shutdown to its owner."""
+  try:
+    try:
+      # WNOWAIT avoids taking Popen's waitpid lock while the renderer runs.
+      # Main-thread terminate()/wait(timeout) therefore stays bounded even if
+      # the renderer ignores SIGTERM, or a control signal arrives immediately.
+      os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOWAIT)
+    except (AttributeError, OSError):
+      child.wait()
+  finally:
+    event.set()
+
+
 def supervise(root, binary, environment=None, *, startup_timeout=18, readiness=None, shutdown_timeout=8):
   from .recovery import healthy
   root = Path(root).resolve()
@@ -96,6 +110,7 @@ def supervise(root, binary, environment=None, *, startup_timeout=18, readiness=N
     raise
   policy = FailureWindow()
   interrupted = threading.Event()
+  child_wakeup = None
   child = None
   stopping = False
   requested = None
@@ -110,6 +125,8 @@ def supervise(root, binary, environment=None, *, startup_timeout=18, readiness=N
     else:
       requested = 'normal' if signum == signal.SIGUSR1 else 'recovery'
     interrupted.set()
+    if child_wakeup is not None:
+      child_wakeup.set()
     if child is not None and child.poll() is None:
       child.terminate()
 
@@ -127,6 +144,7 @@ def supervise(root, binary, environment=None, *, startup_timeout=18, readiness=N
       child_environment = {**environment, 'HYPRLARP_SUPERVISOR_PID': str(os.getpid()),
         'HYPRLARP_RECOVERY_REASON': reason, 'QT_LINUX_ACCESSIBILITY_ALWAYS_ON': '1'}
       entry = 'recovery.qml' if mode == 'recovery' else 'shell.qml'
+      child_wakeup = threading.Event()
       child = subprocess.Popen([binary, '--path', str(root / entry), '--no-duplicate'], env=child_environment)
       deadline, stable = time.monotonic() + startup_timeout, 0
       ready = False
@@ -144,17 +162,19 @@ def supervise(root, binary, environment=None, *, startup_timeout=18, readiness=N
         terminate(child, shutdown_timeout)
         continue
       if ready:
-        # Wait for process exit without health polling. A stuck Qt process must
-        # still yield to an explicit recovery request within a bounded time.
-        while not stopping and requested is None:
-          try:
-            code = child.wait(timeout=.5)
-            break
-          except subprocess.TimeoutExpired:
-            pass
+        # One blocking kernel wait replaces subprocess.wait(timeout)'s busy
+        # wait. Each generation captures its own event, so a late notification
+        # from the previous renderer cannot wake a replacement renderer.
+        watcher = threading.Thread(target=notify_exit, args=(child, child_wakeup),
+          name='hyprlarp-renderer-exit', daemon=True)
+        watcher.start()
+        child_wakeup.wait()
         if stopping or requested:
           terminate(child, shutdown_timeout)
+          watcher.join(timeout=3)
           continue
+        code = child.wait()
+        watcher.join(timeout=3)
         if code == 0:
           return 0
         reason = 'El proceso del shell terminó inesperadamente.'

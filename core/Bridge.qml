@@ -12,6 +12,13 @@ Singleton {
   onReadyChanged: if (ready && Quickshell.env("HYPRLARP_BENCHMARK") === "1")
     console.log("BENCHMARK_READY " + Date.now())
   property bool connected: false
+  property string releaseVersion: ""
+  property var onboarding: ({
+      needed: false,
+      status: "loading",
+      readOnly: false,
+      error: ""
+    })
   property string settingsOperation: ""
   property string queuedSettingsOperation: ""
   property var queuedSettingsData: ({})
@@ -349,6 +356,12 @@ Singleton {
     try {
       const event = JSON.parse(line);
       switch (event.type) {
+      case "version":
+        releaseVersion = event.data;
+        break;
+      case "onboarding":
+        onboarding = event.data;
+        break;
       case "modules":
         moduleDefinitions = event.data;
         break;
@@ -381,7 +394,11 @@ Singleton {
         awaitingInitial = false;
         confirmedSettings = event.data;
         submittedSettings = {};
-        settings = Object.assign({}, confirmedSettings, queuedValues(), pending);
+        const reconciled = Object.assign({}, confirmedSettings, queuedValues(), pending);
+        // The optimistic values already drove the interface. An identical
+        // acknowledgment must not invalidate every binding a second time.
+        if (JSON.stringify(settings) !== JSON.stringify(reconciled))
+          settings = reconciled;
         settingsOperation = "";
         ready = true;
         if (initial) {
@@ -507,9 +524,11 @@ Singleton {
         actionFinished(event.data.action);
         break;
       case "idle":
-        const remaining = Object.assign({}, busyActions);
-        remaining[event.data.action] = Math.max(0, (remaining[event.data.action] || 1) - 1);
-        busyActions = remaining;
+        if ((busyActions[event.data.action] || 0) > 0) {
+          const remaining = Object.assign({}, busyActions);
+          remaining[event.data.action]--;
+          busyActions = remaining;
+        }
         if (busyAction === event.data.action)
           busyAction = "";
         break;
