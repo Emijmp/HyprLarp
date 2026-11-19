@@ -21,6 +21,35 @@ VERSION_LIMIT = 30
 HISTORY_BYTES = 6 * 1024 * 1024
 TRANSIENT = {"version", "doNotDisturb", "clipboardPaused"}
 CAPTURE_SHORTCUT = "screenshot-region-frozen"
+HISTORY_VERSION = 2
+# Values introduced after the original journal format. Keep these recorded
+# defaults stable; a later schema change needs its own migration step.
+LEGACY_DEFAULTS = {
+  "accessibilityTextScale": 1,
+  "accessibilityHighContrast": False,
+  "accessibilityReducedMotion": False,
+  "accessibilityLargeTargets": False,
+  "accessibilityMinimumFontSize": 12,
+  "themeScheduleEnabled": False,
+  "themeDay": "paper",
+  "themeNight": "amoled",
+  "themeDayStart": "07:00",
+  "themeNightStart": "19:00",
+  "panelLayout": "floating",
+  "panelStyle": "standard",
+  "panelBlur": False,
+  "performanceMode": "balanced",
+}
+# Legacy heads contain only a fingerprint, including journals with no complete
+# snapshots. These are the additions made in the recorded releases.
+LEGACY_HEAD_GROUPS = (
+  frozenset({"accessibilityTextScale", "accessibilityHighContrast",
+    "accessibilityReducedMotion", "accessibilityLargeTargets"}),
+  frozenset({"accessibilityMinimumFontSize"}),
+  frozenset(key for key in LEGACY_DEFAULTS if not key.startswith("accessibility")),
+)
+LEGACY_HEAD_SHAPES = tuple(frozenset().union(*(group for index, group in enumerate(LEGACY_HEAD_GROUPS)
+  if mask & (1 << index))) for mask in range(1 << len(LEGACY_HEAD_GROUPS)))
 
 
 def capture_default(values):
@@ -48,15 +77,24 @@ def fingerprint(settings):
 class Revisions:
   def __init__(self, directory):
     self.path = directory / "settings-history.json"
-    self.document = {"type": "hyprlarp-settings-history", "version": 1, "head": "", "undo": [], "redo": [], "revisions": []}
+    self.document = {"type": "hyprlarp-settings-history", "version": HISTORY_VERSION, "head": "", "undo": [], "redo": [], "revisions": []}
     self.warning = ""
+    self.read_only = False
     self.added_defaults = set()
     self.capture_migrations = set()
+    self.legacy = False
+    self.legacy_head_shapes = set(LEGACY_HEAD_SHAPES)
     if self.path.exists():
       try:
         data = read_json(self.path, limit=HISTORY_BYTES)
-        if not isinstance(data, dict) or data.get("type") != self.document["type"] or data.get("version") != 1:
+        if (isinstance(data, dict) and data.get("type") == self.document["type"]
+            and type(data.get("version")) is int and data["version"] > HISTORY_VERSION):
+          self.read_only = True
+          raise ValueError("El historial usa una versión posterior; se conserva sin modificar")
+        if (not isinstance(data, dict) or data.get("type") != self.document["type"]
+            or type(data.get("version")) is not int or data["version"] not in {1, HISTORY_VERSION}):
           raise ValueError("Formato de historial desconocido")
+        self.legacy = data["version"] == 1
         revisions = data.get("revisions")
         if not isinstance(revisions, list) or len(revisions) > VERSION_LIMIT:
           raise ValueError("Historial de versiones inválido")
@@ -71,11 +109,12 @@ class Revisions:
           if not isinstance(item.get("label"), str) or len(item["label"]) > 120:
             raise ValueError("Nombre de versión inválido")
           values = item.get('settings')
-          if isinstance(values, dict):
+          if self.legacy and isinstance(values, dict):
             missing = (set(DEFAULTS) - TRANSIENT) - set(values)
-            if missing and all(key.startswith('accessibility') for key in missing):
+            if missing and missing <= LEGACY_DEFAULTS.keys():
               self.added_defaults.update(missing)
-              values.update({key: copy.deepcopy(DEFAULTS[key]) for key in missing})
+              self.legacy_head_shapes.add(frozenset(missing))
+              values.update({key: copy.deepcopy(LEGACY_DEFAULTS[key]) for key in missing})
           self.migrate_capture(values)
           self.validate_values(values, complete=True)
         for name in ("undo", "redo"):
@@ -90,6 +129,9 @@ class Revisions:
             self.validate_values(entry["after"])
             if set(entry["before"]) != set(entry["after"]):
               raise ValueError("Cambio incompleto")
+        # Loading migrates only the in-memory document. The normal atomic save
+        # writes the new version after the next actual configuration edit.
+        data["version"] = HISTORY_VERSION
         self.document = data
       except (OSError, ValueError, TypeError, KeyError) as error:
         self.warning = "No se pudo leer el historial de configuración: " + str(error)
@@ -98,7 +140,7 @@ class Revisions:
     shortcuts = values.get("shortcuts") if isinstance(values, dict) else None
     if not isinstance(shortcuts, dict):
       return
-    if set(shortcuts) == set(DEFAULTS["shortcuts"]) - {CAPTURE_SHORTCUT}:
+    if self.legacy and set(shortcuts) == set(DEFAULTS["shortcuts"]) - {CAPTURE_SHORTCUT}:
       self.capture_migrations.add(id(shortcuts))
     if id(shortcuts) in self.capture_migrations:
       shortcuts[CAPTURE_SHORTCUT] = capture_default({**(context or {}), **values})
@@ -119,13 +161,16 @@ class Revisions:
 
   def stacks(self, settings):
     candidates = [settings]
-    if self.added_defaults:
-      candidates.append({key: value for key, value in settings.items() if key not in self.added_defaults})
-    if settings.get("shortcuts", {}).get(CAPTURE_SHORTCUT) == capture_default(settings):
-      for candidate in list(candidates):
-        previous = copy.deepcopy(candidate)
-        previous["shortcuts"].pop(CAPTURE_SHORTCUT, None)
-        candidates.append(previous)
+    if self.legacy:
+      for removed in self.legacy_head_shapes:
+        # New nondefault values are real edits, not an automatic migration.
+        if removed and all(settings.get(key) == LEGACY_DEFAULTS[key] for key in removed):
+          candidates.append({key: value for key, value in settings.items() if key not in removed})
+      if settings.get("shortcuts", {}).get(CAPTURE_SHORTCUT) == capture_default(settings):
+        for candidate in list(candidates):
+          previous = copy.deepcopy(candidate)
+          previous["shortcuts"].pop(CAPTURE_SHORTCUT, None)
+          candidates.append(previous)
     if not any(self.document.get("head") == fingerprint(candidate) for candidate in candidates):
       return [], []
     # Partial undo entries inherit custom binds from their historical context.
@@ -139,13 +184,15 @@ class Revisions:
     return copy.deepcopy(self.document["undo"]), copy.deepcopy(self.document["redo"])
 
   def save(self, before, settings, undo, redo, *, capture=True, label="Configuración"):
+    if self.read_only:
+      raise ValueError("El historial usa una versión posterior; se conserva sin modificar")
     document = copy.deepcopy(self.document)
     versions = document["revisions"]
     for value, title in ((before, "Antes del cambio"), (settings, label)) if capture else ():
       value = portable(value)
       if not versions or versions[-1]["settings"] != value:
         versions.append({"id": uuid.uuid4().hex, "time": time.time(), "label": title, "settings": value})
-    document.update(head=fingerprint(settings), undo=copy.deepcopy(undo), redo=copy.deepcopy(redo), revisions=versions[-VERSION_LIMIT:])
+    document.update(version=HISTORY_VERSION, head=fingerprint(settings), undo=copy.deepcopy(undo), redo=copy.deepcopy(redo), revisions=versions[-VERSION_LIMIT:])
     # Retain the most recent data if unusually large per-monitor settings would
     # exceed the disk budget; normal defaults remain far below this limit.
     while len(json.dumps(document, ensure_ascii=False).encode()) > HISTORY_BYTES - 1024:
@@ -159,6 +206,8 @@ class Revisions:
         raise ValueError("La configuración supera el límite del historial")
     atomic_json(self.path, document)
     self.document = document
+    self.legacy = False
+    self.capture_migrations.clear()
 
   def get(self, ident):
     if not isinstance(ident, str):

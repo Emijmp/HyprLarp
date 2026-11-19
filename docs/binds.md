@@ -6,7 +6,7 @@ HyprLarp conserva tus combinaciones y permite gestionar las personalizaciones de
 
 ## Instalar la integración
 
-Desde el repositorio ejecuta `./install.sh`. Para actualizar una instalación anterior, vuelve a ejecutar el mismo script; conserva los ajustes válidos y hace respaldos.
+Desde el repositorio ejecuta `./install.sh`. Para actualizar una instalación anterior, vuelve a ejecutar el mismo script. La actualización conserva los archivos de ajustes y los binds activos, incluidos los cambios guardados que todavía no hayas aplicado. Los atajos solo cambian al pulsar **Aplicar binds** en configuración. También se conservan los márgenes activos, las preferencias de reposo y los archivos de integración que hayas personalizado; los archivos del programa se actualizan con respaldo.
 
 En `~/.config/hypr/hyprland.lua`, coloca este bloque **antes del primer `hl.bind`**, preferentemente al principio:
 

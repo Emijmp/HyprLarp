@@ -70,6 +70,14 @@ class SessionControlTests(unittest.TestCase):
       locations = replace(isolated, prefix='')
       sentinel = locations.app / 'previous-version'
       sentinel.write_text('running recovery version')
+      # Model a real owned file removed in the next release, rather than a
+      # foreign file which a code update must now preserve.
+      from deployment import MARKER, digest
+      marker = locations.app / MARKER
+      manifest = json.loads(marker.read_text())
+      manifest['prefix'] = ''
+      manifest['files']['previous-version'] = digest(sentinel)
+      marker.write_text(json.dumps(manifest))
 
       def stopped_before_replacement(*args, **options):
         self.assertTrue(sentinel.is_file())

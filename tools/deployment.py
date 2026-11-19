@@ -126,8 +126,12 @@ def commit(locations, stage, contents, manifest, activate=None):
   stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
   backups, written = {}, []
   targets = {**locations.managed(), "settings": locations.config / "settings.json"}
+  if set(contents) - set(targets):
+    raise ValueError("El plan contiene destinos de instalación desconocidos")
   try:
-    for target in [locations.app, *targets.values()]:
+    # Unchanged configuration is outside the write transaction: never rename it
+    # merely because the application code is being updated.
+    for target in [locations.app, *[targets[role] for role in contents]]:
       no_symlinks(target)
       if target.exists():
         backup = target.with_name(target.name + ".backup-" + stamp)
@@ -137,8 +141,8 @@ def commit(locations, stage, contents, manifest, activate=None):
     written.append(locations.app)
     for role, data in contents.items():
       target = targets[role]
-      atomic_bytes(target, data)
       written.append(target)
+      atomic_bytes(target, data)
       if role == "launcher":
         target.chmod(0o755)
     atomic_bytes(locations.app / MARKER, manifest)

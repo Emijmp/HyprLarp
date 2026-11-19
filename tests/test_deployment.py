@@ -101,16 +101,20 @@ class DeploymentTests(unittest.TestCase):
     self.install()
     old_launcher = self.locations.executable.read_bytes()
     old_manifest = (self.locations.app / deployment.MARKER).read_bytes()
+    old_service = self.locations.managed()['service'].read_bytes()
     write = deployment.atomic_bytes
     def failing(path, content):
-      if path == self.locations.config / "bindings.lua":
+      if path == self.locations.app / deployment.MARKER:
         raise OSError("injected write failure")
       return write(path, content)
-    with patch("deployment.atomic_bytes", side_effect=failing), contextlib.redirect_stdout(io.StringIO()):
+    with patch("deployment.atomic_bytes", side_effect=failing), \
+        patch("install.recovery.render_unit", return_value=old_service.decode() + '# candidate unit\n'), \
+        contextlib.redirect_stdout(io.StringIO()):
       with self.assertRaises(OSError):
         install(self.locations)
     self.assertEqual(self.locations.executable.read_bytes(), old_launcher)
     self.assertEqual((self.locations.app / deployment.MARKER).read_bytes(), old_manifest)
+    self.assertEqual(self.locations.managed()['service'].read_bytes(), old_service)
 
   def test_failed_runtime_validation_restores_code_unit_and_settings(self):
     self.install()

@@ -45,11 +45,23 @@ def stop_runtime(locations):
       continue
 
 
+def remove_optional_greeter(locations, *, dry_run=False, stop=True):
+  if locations.prefix or not stop:
+    return
+  greeter = locations.data / 'hyprlarp-greeter/installation.json'
+  if greeter.is_file():
+    # Finish privileged restoration before removing the shell. A missing
+    # administrator credential must leave the desktop installation intact.
+    from install_greeter import uninstall_user
+    uninstall_user(dry_run=dry_run)
+
+
 def _uninstall(locations, *, dry_run=False, purge=False, stop=True):
   locations.validate()
   if not locations.app.exists():
     if purge:
       raise ValueError('Sin manifiesto de instalación no se borran ajustes; se han conservado.')
+    remove_optional_greeter(locations, dry_run=dry_run, stop=stop)
     print('HyprLarp no está instalado en este destino. Los ajustes se conservan.')
     return
   manifest = load_manifest(locations)
@@ -65,6 +77,7 @@ def _uninstall(locations, *, dry_run=False, purge=False, stop=True):
   for path in preserved:
     print('Conservar modificado: ' + str(path))
   print(('Quitar carpeta de ajustes completa, incluidos respaldos internos: ' if purge else 'Conservar ajustes: ') + str(locations.config))
+  remove_optional_greeter(locations, dry_run=dry_run, stop=stop)
   if dry_run:
     return
   if stop:

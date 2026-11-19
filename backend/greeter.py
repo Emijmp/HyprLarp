@@ -353,14 +353,25 @@ def sync(settings_path, waypaper, *, force=False):
 def main():
   config = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
   parser = argparse.ArgumentParser(description='Sincroniza el greeter de greetd con HyprLarp')
-  parser.add_argument('command', choices=['sync', 'export', 'status', 'preview'])
+  parser.add_argument('command', choices=['sync', 'export', 'status', 'preview', 'uninstall'])
   parser.add_argument('--settings', type=Path, default=config / 'hyprlarp/settings.json')
   parser.add_argument('--waypaper', type=Path, default=config / 'waypaper/config.ini')
   parser.add_argument('--output', type=Path, help='Directorio privado de exportación')
   parser.add_argument('--force', action='store_true')
+  parser.add_argument('--dry-run', action='store_true', help='Mostrar la retirada del greeter sin modificar archivos')
   args = parser.parse_args()
+  if args.dry_run and args.command != 'uninstall':
+    parser.error('--dry-run solo se admite con uninstall')
   try:
-    if args.command == 'export':
+    if args.command == 'uninstall':
+      # The standalone user bridge ships its own lifecycle controller, so this
+      # entry point also works after moving the checkout or removing the shell.
+      import sys
+      sys.path.insert(0, str(ROOT))
+      from tools.install_greeter import uninstall_user
+      uninstall_user(dry_run=args.dry_run)
+      return
+    elif args.command == 'export':
       if not args.output:
         parser.error('export requiere --output')
       files, report = payload(args.settings, args.waypaper)

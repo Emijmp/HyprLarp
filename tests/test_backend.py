@@ -303,12 +303,16 @@ class InstallerTests(unittest.TestCase):
       subprocess.run(invocation, check=True, capture_output=True, text=True)
       config = prefix / "config/hyprlarp"
       Store(config).update({"accent": "#123456"})
+      active_bindings = (config / "bindings.lua").read_bytes()
+      bindings_inode = (config / "bindings.lua").stat().st_ino
       subprocess.run(invocation, check=True, capture_output=True, text=True)
       self.assertEqual(Store(config).settings["accent"], "#123456")
       self.assertTrue((prefix / "bin/hyprlarp").is_file())
       self.assertTrue((prefix / "share/hyprlarp/shell.qml").is_file())
       self.assertTrue(list((prefix / "share").glob("hyprlarp.backup-*")))
-      self.assertTrue(list(config.glob("bindings.lua.backup-*")))
+      self.assertEqual((config / "bindings.lua").read_bytes(), active_bindings)
+      self.assertEqual((config / "bindings.lua").stat().st_ino, bindings_inode)
+      self.assertFalse(list(config.glob("bindings.lua.backup-*")))
       self.assertIn("inhibit_sleep = 3", (config / "hypridle.conf").read_text())
 
   def test_dry_run_does_not_create_the_destination(self):

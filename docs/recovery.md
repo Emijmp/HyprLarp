@@ -33,4 +33,6 @@ La supervisión termina únicamente su proceso de Quickshell al detenerse o camb
 
 Las actualizaciones realizadas con el instalador mientras el shell está funcionando esperan a que cierre la instancia anterior, aplican el paquete preparado y comprueban el nuevo arranque. Si falla la activación, restauran los archivos, el servicio y los ajustes anteriores y vuelven a iniciar la versión previa. Las instalaciones con `--prefix` permanecen aisladas y nunca controlan la sesión real.
 
+Actualizar el programa conserva `settings.json`, el historial, los binds activos, los márgenes y `hypridle.conf` sin reescribirlos. Las modificaciones pendientes de **Aplicar binds** no se activan durante la actualización. Los archivos de integración generados solo se renuevan cuando todavía coinciden con su versión instalada; las personalizaciones y los archivos ajenos se conservan. Lo mismo ocurre con los archivos del programa modificados por el usuario. El manifiesto mantiene su propiedad original, de modo que desinstalar tampoco elimina esas modificaciones.
+
 Referencia: [supervisión y límites de reinicio de systemd](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html).

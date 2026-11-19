@@ -11,11 +11,71 @@ import subprocess
 import sys
 import tempfile
 
-from deployment import ROOT, Locations, commit, copy_sources, desktop_word, deployment_lock
+from deployment import ROOT, Locations, MARKER, commit, copy_sources, desktop_word, deployment_lock, digest, load_manifest, no_symlinks
 sys.path.insert(0, str(ROOT))
 from backend.service import Store, generate_bindings, lua_string, read_regular
 from backend.gaps import render as render_window_gaps
 from backend import recovery
+
+ACTIVE_FILES = {'settings', 'bindings', 'gaps', 'idle'}
+
+
+def preserve_application(locations, stage, files, previous):
+  """Keep local application edits and foreign files across a code replacement."""
+  if previous is None:
+    return
+  for source in sorted(locations.app.rglob('*')):
+    relative = source.relative_to(locations.app)
+    if relative.as_posix() == MARKER:
+      continue
+    no_symlinks(source)
+    destination = stage / relative
+    if source.is_dir():
+      if destination.exists() and not destination.is_dir():
+        raise ValueError('Un directorio local coincide con un archivo del paquete: ' + str(source))
+      destination.mkdir(parents=True, exist_ok=True)
+      continue
+    if not source.is_file():
+      raise ValueError('Archivo local no regular en la instalación: ' + str(source))
+    name = relative.as_posix()
+    owned = previous['files'].get(name)
+    if owned is None or digest(source) != owned:
+      if destination.exists() and not destination.is_file():
+        raise ValueError('Un archivo local coincide con un directorio del paquete: ' + str(source))
+      destination.parent.mkdir(parents=True, exist_ok=True)
+      shutil.copy2(source, destination)
+      if owned is None:
+        files.pop(name, None)
+      else:
+        # Keep the old ownership hash, so uninstall preserves the local edit.
+        files[name] = owned
+      print('Conservar archivo local: ' + str(source))
+
+
+def plan_managed(locations, contents, previous):
+  """An update changes code; applying saved preferences is a separate action."""
+  import hashlib
+  planned, owned = {}, {}
+  targets = {**locations.managed(), 'settings': locations.config / 'settings.json'}
+  for role, data in contents.items():
+    target = targets[role]
+    previous_hash = (previous or {}).get('managed', {}).get(role)
+    if target.exists():
+      if not target.is_file():
+        raise ValueError('El destino debe ser un archivo regular: ' + str(target))
+      current_hash = digest(target)
+      if role in ACTIVE_FILES or previous_hash is None or current_hash != previous_hash:
+        if previous_hash is not None and role != 'settings':
+          owned[role] = previous_hash
+        print('Conservar configuración activa: ' + str(target))
+        continue
+      if target.read_bytes() == data:
+        owned[role] = previous_hash
+        continue
+    planned[role] = data
+    if role != 'settings':
+      owned[role] = hashlib.sha256(data).hexdigest()
+  return planned, owned
 
 
 def _install(locations, dry_run=False):
@@ -24,10 +84,16 @@ def _install(locations, dry_run=False):
     print(location)
   if dry_run:
     return
+  previous = None
+  if locations.app.exists():
+    if not (locations.app / MARKER).is_file():
+      raise ValueError('El destino ya existe sin un manifiesto de HyprLarp; se ha conservado.')
+    previous = load_manifest(locations)
   locations.app.parent.mkdir(parents=True, exist_ok=True)
   stage = Path(tempfile.mkdtemp(prefix='.hyprlarp-stage-', dir=locations.app.parent))
   try:
     files = copy_sources(stage)
+    preserve_application(locations, stage, files, previous)
     with tempfile.TemporaryDirectory(prefix='hyprlarp-settings-') as temporary:
       folder = Path(temporary)
       current = locations.config / 'settings.json'
@@ -65,9 +131,9 @@ def _install(locations, dry_run=False):
       'service': recovery.render_unit(executable, locations.app),
     }
     contents = {role: text.encode('utf-8') for role, text in contents.items()}
-    import hashlib
+    contents, managed = plan_managed(locations, contents, previous)
     manifest = {'type': 'hyprlarp-install', 'version': 1, 'prefix': locations.prefix, 'files': files,
-      'managed': {role: hashlib.sha256(data).hexdigest() for role, data in contents.items() if role != 'settings'}}
+      'managed': managed}
     locations.config.mkdir(parents=True, exist_ok=True, mode=0o700)
     locations.config.chmod(0o700)
     # A live update is accepted only after the installed shell actually responds.

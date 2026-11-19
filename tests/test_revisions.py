@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from backend.service import DEFAULTS, Service, Store
-from backend.revisions import CAPTURE_SHORTCUT, VERSION_LIMIT, fingerprint
+from backend.revisions import CAPTURE_SHORTCUT, HISTORY_VERSION, LEGACY_DEFAULTS, VERSION_LIMIT, fingerprint
 
 
 class PersistentHistoryTests(unittest.TestCase):
@@ -118,6 +118,7 @@ class PersistentHistoryTests(unittest.TestCase):
     settings = copy.deepcopy(self.store.settings)
     settings["shortcuts"].pop(CAPTURE_SHORTCUT)
     history = json.loads(self.store.revisions.path.read_text())
+    history["version"] = 1
     history["head"] = fingerprint(settings)
     values = [item["settings"] for item in history["revisions"]]
     for name in ("undo", "redo"):
@@ -209,3 +210,147 @@ class PersistentHistoryTests(unittest.TestCase):
     self.assertEqual(restarted.history_state(), {"undo": 1, "redo": 0})
     self.assertEqual(restarted.revisions.path.read_bytes(), unchanged)
     self.assertEqual(restarted.undo()["font"], DEFAULTS["font"])
+
+  def legacy_visual_history(self, removed=None):
+    self.legacy_capture_history()
+    removed = set(LEGACY_DEFAULTS) if removed is None else set(removed)
+    settings = json.loads(self.store.file.read_text())
+    history = json.loads(self.store.revisions.path.read_text())
+    for key in removed:
+      settings.pop(key, None)
+    history["head"] = fingerprint(settings)
+    for revision in history["revisions"]:
+      for key in removed:
+        revision["settings"].pop(key, None)
+    self.store.file.write_text(json.dumps(settings))
+    self.store.revisions.path.write_text(json.dumps(history))
+    return self.store.file.read_bytes(), self.store.revisions.path.read_bytes()
+
+  def test_legacy_visual_history_preserves_versions_and_undo_redo_without_writes(self):
+    self.store.update({"font": "Monospace", "theme": "oxocarbon"})
+    self.store.update({"barSize": 50})
+    self.store.undo()
+    before = self.legacy_visual_history()
+    original = json.loads(before[1])
+    restarted = Store(self.directory)
+    self.assertEqual(restarted.warning, "")
+    self.assertEqual(restarted.history_state(), {"undo": 1, "redo": 1})
+    self.assertEqual((restarted.file.read_bytes(), restarted.revisions.path.read_bytes()), before)
+    self.assertEqual(restarted.revisions.document["version"], HISTORY_VERSION)
+    migrated = restarted.revisions.document["revisions"]
+    self.assertEqual([v["id"] for v in migrated], [v["id"] for v in original["revisions"]])
+    for old, new in zip(original["revisions"], migrated):
+      for field in ("id", "label", "time"):
+        self.assertEqual(new[field], old[field])
+      for key, value in old["settings"].items():
+        if key != "shortcuts":
+          self.assertEqual(new["settings"][key], value)
+      for key, value in LEGACY_DEFAULTS.items():
+        self.assertEqual(new["settings"][key], value)
+    self.assertEqual(restarted.undo()["font"], DEFAULTS["font"])
+    self.assertEqual(restarted.redo()["font"], "Monospace")
+    self.assertEqual(restarted.redo()["barSize"], 50)
+    persisted = json.loads(restarted.revisions.path.read_text())
+    self.assertEqual(persisted["version"], HISTORY_VERSION)
+    self.assertEqual(Store(self.directory).history_state(), {"undo": 2, "redo": 0})
+
+  def test_mixed_legacy_snapshot_schemas_match_the_head_schema(self):
+    self.store.update({"font": "Monospace"})
+    self.store.update({"barSize": 50})
+    removed = set(LEGACY_DEFAULTS) - {"accessibilityTextScale", "accessibilityHighContrast",
+      "accessibilityReducedMotion", "accessibilityLargeTargets"}
+    self.legacy_visual_history(removed)
+    history = json.loads(self.store.revisions.path.read_text())
+    for key in LEGACY_DEFAULTS:
+      history["revisions"][0]["settings"].pop(key, None)
+    self.store.revisions.path.write_text(json.dumps(history))
+    restarted = Store(self.directory)
+    self.assertEqual(restarted.warning, "")
+    self.assertEqual(restarted.history_state(), {"undo": 2, "redo": 0})
+    self.assertEqual(len(restarted.revisions.document["revisions"]), len(history["revisions"]))
+
+  def test_legacy_visual_head_without_snapshots_preserves_partial_undo(self):
+    self.store.update({"font": "Monospace"})
+    removed = set(LEGACY_DEFAULTS) - {"accessibilityTextScale", "accessibilityHighContrast",
+      "accessibilityReducedMotion", "accessibilityLargeTargets"}
+    self.legacy_visual_history(removed)
+    history = json.loads(self.store.revisions.path.read_text())
+    history["revisions"] = []
+    self.store.revisions.path.write_text(json.dumps(history))
+    restarted = Store(self.directory)
+    self.assertEqual(restarted.warning, "")
+    self.assertEqual(restarted.history_state(), {"undo": 1, "redo": 0})
+    self.assertEqual(restarted.undo()["font"], DEFAULTS["font"])
+
+  def test_external_edits_to_new_defaults_cannot_be_hidden_by_legacy_head_matching(self):
+    self.store.update({"font": "Monospace"})
+    self.legacy_visual_history()
+    original = json.loads(self.store.file.read_text())
+    for key, value in (("panelLayout", "centered"), ("themeScheduleEnabled", True),
+        ("performanceMode", "efficient"), ("accessibilityMinimumFontSize", 16)):
+      settings = {**original, key: value}
+      self.store.file.write_text(json.dumps(settings))
+      restarted = Store(self.directory)
+      self.assertEqual(restarted.warning, "")
+      self.assertEqual(restarted.settings[key], value)
+      self.assertEqual(restarted.history_state(), {"undo": 0, "redo": 0})
+      self.assertTrue(restarted.revisions.listing(restarted.settings))
+
+  def test_legacy_migration_rejects_unknown_missing_and_invalid_existing_values(self):
+    self.store.update({"font": "Monospace"})
+    self.legacy_visual_history()
+    document = json.loads(self.store.revisions.path.read_text())
+    for mutation in ("unknown", "missing", "invalid"):
+      with self.subTest(mutation=mutation):
+        corrupted = copy.deepcopy(document)
+        values = corrupted["revisions"][0]["settings"]
+        if mutation == "unknown":
+          values["futurePanelOption"] = True
+        elif mutation == "missing":
+          values.pop("font")
+        else:
+          values["panelBlur"] = "yes"
+        self.store.revisions.path.write_text(json.dumps(corrupted))
+        unchanged = self.store.revisions.path.read_bytes()
+        restarted = Store(self.directory)
+        self.assertTrue(restarted.warning)
+        self.assertEqual(restarted.settings["font"], "Monospace")
+        self.assertEqual(restarted.history_state(), {"undo": 0, "redo": 0})
+        self.assertEqual(restarted.revisions.path.read_bytes(), unchanged)
+
+  def test_current_schema_does_not_silently_repair_truncated_snapshots(self):
+    self.store.update({"font": "Monospace"})
+    document = json.loads(self.store.revisions.path.read_text())
+    self.assertEqual(document["version"], HISTORY_VERSION)
+    document["revisions"][0]["settings"].pop("panelLayout")
+    self.store.revisions.path.write_text(json.dumps(document))
+    restarted = Store(self.directory)
+    self.assertTrue(restarted.warning)
+    self.assertEqual(restarted.history_state(), {"undo": 0, "redo": 0})
+
+  def test_future_or_boolean_schema_versions_are_rejected_without_modification(self):
+    self.store.update({"font": "Monospace"})
+    document = json.loads(self.store.revisions.path.read_text())
+    for version in (HISTORY_VERSION + 1, True, "1"):
+      with self.subTest(version=version):
+        document["version"] = version
+        self.store.revisions.path.write_text(json.dumps(document))
+        unchanged = self.store.revisions.path.read_bytes()
+        restarted = Store(self.directory)
+        self.assertTrue(restarted.warning)
+        self.assertEqual(restarted.settings["font"], "Monospace")
+        self.assertEqual(restarted.revisions.path.read_bytes(), unchanged)
+
+  def test_settings_edits_preserve_a_newer_unsupported_journal(self):
+    self.store.update({"font": "Monospace"})
+    document = json.loads(self.store.revisions.path.read_text())
+    document["version"] = HISTORY_VERSION + 1
+    self.store.revisions.path.write_text(json.dumps(document))
+    unchanged = self.store.revisions.path.read_bytes()
+    restarted = Store(self.directory)
+    self.assertTrue(restarted.revisions.read_only)
+    self.assertIn("posterior", restarted.warning)
+    restarted.update({"font": "Sans Serif"})
+    self.assertEqual(json.loads(restarted.file.read_text())["font"], "Sans Serif")
+    self.assertEqual(restarted.revisions.path.read_bytes(), unchanged)
+    self.assertIn("posterior", restarted.warning)

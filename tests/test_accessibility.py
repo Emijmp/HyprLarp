@@ -22,6 +22,7 @@ class AccessibilityTests(unittest.TestCase):
       keys = {key for key in DEFAULTS if key.startswith('accessibility')}
       settings = {key: value for key, value in store.settings.items() if key not in keys}
       history = json.loads(store.revisions.path.read_text())
+      history['version'] = 1
       history['head'] = fingerprint(settings)
       for revision in history['revisions']:
         for key in keys: revision['settings'].pop(key, None)
