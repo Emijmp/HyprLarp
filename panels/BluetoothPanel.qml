@@ -102,10 +102,11 @@ ColumnLayout {
     }
   }
   EmptyState {
+    objectName: "bluetooth-empty"
     visible: (Bridge.bluetooth.devices || []).length === 0
     error: !Bridge.bluetooth.available || !!Bridge.bluetooth.error
-    title: Bridge.bluetooth.available ? "Sin dispositivos" : "Sin adaptador Bluetooth"
-    description: "Pon el dispositivo en modo de vinculación y pulsa Buscar."
+    title: !Bridge.bluetooth.available ? "Sin adaptador Bluetooth" : Bridge.bluetooth.enabled ? "Sin dispositivos" : "Bluetooth desactivado"
+    description: !Bridge.bluetooth.available ? "Comprueba que el equipo tenga un adaptador Bluetooth y que BlueZ esté iniciado." : Bridge.bluetooth.enabled ? "Pon el dispositivo en modo de vinculación y pulsa Buscar." : "Activa Bluetooth para buscar dispositivos."
   }
   Connections {
     target: Bridge

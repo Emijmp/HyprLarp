@@ -18,8 +18,13 @@ class PanelPreviewTests(unittest.TestCase):
         'XDG_RUNTIME_DIR': folder, 'HYPRLARP_STATE_DIR': str(Path(folder) / 'settings'), 'HYPRLARP_PREVIEW': '1',
         'HYPRLARP_VISUAL_WALLPAPER': str(wallpaper)}
       environment.pop('WAYLAND_DISPLAY', None)
-      result = subprocess.run(['quickshell', '--path', str(ROOT / 'visual-check.qml'), '--no-color'],
-        env=environment, text=True, capture_output=True, timeout=35)
+      try:
+        result = subprocess.run(['quickshell', '--path', str(ROOT / 'visual-check.qml'), '--no-color'],
+          env=environment, text=True, capture_output=True, timeout=35)
+      except subprocess.TimeoutExpired as error:
+        def text(value):
+          return value.decode(errors='replace') if isinstance(value, bytes) else value or ''
+        self.fail((text(error.stdout) + text(error.stderr))[-16000:] + '\nLa vista previa no completó sus comprobaciones en 35 segundos.')
       output = result.stdout + result.stderr
       self.assertEqual(result.returncode, 0, output)
       self.assertIn('VISUAL COMPLETE', output)

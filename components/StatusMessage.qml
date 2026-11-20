@@ -36,11 +36,12 @@ RowLayout {
     Layout.alignment: Qt.AlignTop
   }
   Controls.Label {
+    objectName: "status-message-text"
     text: root.text
     color: root.error ? Theme.text : Theme.muted
     wrapMode: Text.WordWrap
     Layout.fillWidth: true
-    font.pixelSize: root.fontSize
+    font.pixelSize: Theme.fontPx(root.fontSize)
   }
   Controls.ActionButton {
     objectName: "copy-error"

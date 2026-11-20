@@ -1,0 +1,50 @@
+# Generated from VERSION by tools/package.py; local source has a fixed checksum.
+pkgname=hyprlarp
+pkgver=@PKGVER@
+pkgrel=@PKGREL@
+pkgdesc='Modular Hyprland shell with an optional branded greetd interface'
+arch=('any')
+url='https://github.com/Emijmp/HyprLarp'
+license=('MIT')
+depends=(@DEPENDS@)
+checkdepends=('nodejs' 'lua')
+optdepends=(
+  'networkmanager: Wi-Fi and saved connections'
+  'bluez-utils: Bluetooth device actions'
+  'wireplumber: audio controls with wpctl'
+  'pipewire-audio: audio streams and notification sounds'
+  'brightnessctl: display brightness'
+  'cliphist: clipboard history'
+  'wl-clipboard: copy and capture clipboard content'
+  'grim: screenshots'
+  'slurp: screenshot region selection'
+  'hyprpicker: frozen screenshot selection'
+  'hyprlock: branded lock screen'
+  'hypridle: lock before suspend'
+  'playerctl: media control'
+  'hyprsunset: night light'
+  'power-profiles-daemon: power profiles'
+  'udisks2: removable drives'
+  'imagemagick: screenshot editing and thumbnails'
+  'nm-connection-editor: enterprise connections and VPN'
+  'blueman: advanced Bluetooth settings'
+  'waypaper: external wallpapers'
+  'mpvpaper: video wallpapers'
+  'socat: external wallpaper playback control'
+  'hyprpolkitagent: desktop authorization prompts'
+  'greetd: optional login screen'
+  'noctalia-greeter: optional login compositor and appearance bridge'
+)
+options=('!strip' '!debug')
+source=('@ARCHIVE@')
+sha256sums=('@SHA256@')
+
+check() {
+  cd "$srcdir/hyprlarp-@RELEASE@"
+  PYTHONDONTWRITEBYTECODE=1 python3 tools/check.py --backend-only
+}
+
+package() {
+  cd "$srcdir/hyprlarp-@RELEASE@"
+  PYTHONDONTWRITEBYTECODE=1 python3 tools/package.py stage --destdir "$pkgdir"
+}

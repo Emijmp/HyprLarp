@@ -12,6 +12,13 @@ Las pruebas añaden casos de persistencia después de reiniciar, archivos corrup
 
 El workflow `.github/workflows/check.yml` se ejecuta en push, pull request y bajo demanda. Comprueba el backend en Python 3.11 y 3.14 y ejecuta la suite completa con Qt/Quickshell en Arch como un usuario de prueba sin privilegios. Solo concede lectura del repositorio; los jobs tienen límite de tiempo y cancelan ejecuciones anteriores de la misma rama. Los artefactos contienen registros, versiones y una muestra offscreen; no representan una medición de la GPU del escritorio real.
 
+El mismo workflow construye dos revisiones del [paquete Arch](packaging.md) y realiza
+una [instalación, actualización y retirada en un contenedor nuevo](clean-validation.md).
+Las acciones se fijan por SHA y el checkout no conserva credenciales. El workflow
+[de estabilidad](stability.md) ejecuta dos horas semanalmente o bajo demanda;
+el de [publicación](releasing.md) prepara artefactos y un borrador revisable al recibir
+una etiqueta que coincida con `VERSION` y `CHANGELOG.md`.
+
 ## Organización del backend
 
 | Módulo | Responsabilidad |

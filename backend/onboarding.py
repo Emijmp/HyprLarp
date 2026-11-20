@@ -30,13 +30,15 @@ class Onboarding:
     self.fresh = not (settings.exists() or settings.is_symlink())
     # The installer writes default settings before the shell's first launch.
     # Its flag bridges that gap; updates retain it until the separate state is done.
-    try:
-      manifest = read_json(root / ".hyprlarp-install.json", limit=4 * 1024 * 1024)
-      self.fresh |= (isinstance(manifest, dict) and manifest.get("type") == "hyprlarp-install"
-        and type(manifest.get("version")) is int and manifest["version"] == 1
-        and manifest.get("first_run") is True)
-    except (OSError, ValueError):
-      pass
+    for path, kind in ((root / ".hyprlarp-install.json", "hyprlarp-install"),
+      (directory / ".hyprlarp-session.json", "hyprlarp-session")):
+      try:
+        manifest = read_json(path, limit=4 * 1024 * 1024)
+        self.fresh |= (isinstance(manifest, dict) and manifest.get("type") == kind
+          and type(manifest.get("version")) is int and manifest["version"] == 1
+          and manifest.get("first_run") is True)
+      except (OSError, ValueError):
+        pass
     self.state = None
     self.error = ""
     self._load()

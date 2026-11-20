@@ -49,6 +49,14 @@ class FirstRunStateTests(unittest.TestCase):
       self.assertEqual(state.snapshot()["needed"], automatic)
       self.assertFalse(state.file.exists())
 
+  def test_system_package_tracks_first_run_per_user(self):
+    (self.directory / "settings.json").write_text("{}")
+    marker = self.directory / ".hyprlarp-session.json"
+    marker.write_text(json.dumps({"type": "hyprlarp-session", "version": 1, "first_run": True}))
+    self.assertTrue(Onboarding(self.directory, self.root).snapshot()["needed"])
+    marker.write_text(json.dumps({"type": "hyprlarp-session", "version": 1, "first_run": False}))
+    self.assertFalse(Onboarding(self.directory, self.root).snapshot()["needed"])
+
   def test_completed_and_skipped_states_prevent_further_automatic_prompts(self):
     for status in ["completed", "skipped"]:
       state = Onboarding(self.directory, self.root)

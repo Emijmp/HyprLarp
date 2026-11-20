@@ -13,11 +13,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.service import atomic_bytes, read_json
+from tools.package import SOURCE_DIRS, SOURCE_FILES, SOURCE_SUFFIXES, files as selected_sources
 
 MARKER = ".hyprlarp-install.json"
-DIRECTORIES = {"assets", "backend", "bin", "components", "config", "core", "panels", "widgets", "tools", "tests", "docs", "greeter"}
-FILES = {"VERSION", "HyprLarp.qml", "shell.qml", "recovery.qml", "accessibility-check.qml", "resilience-check.qml", "performance-check.qml", "visual-check.qml", "preview.qml", "settings.qml", "native-types.qml", "README.md", "LICENSE", "Makefile", "install.sh", "uninstall.sh", ".editorconfig", ".qmlformat.ini"}
-SUFFIXES = {".qml", ".py", ".js", ".json", ".lua", ".svg", ".png", ".wav", ".md", ".sh", ".conf"}
+DIRECTORIES, FILES, SUFFIXES = SOURCE_DIRS, SOURCE_FILES, SOURCE_SUFFIXES
 
 
 def absolute(path):
@@ -100,24 +99,11 @@ def desktop_word(value):
 
 def copy_sources(destination):
   result = {}
-  for entry in ROOT.iterdir():
-    if entry.name not in DIRECTORIES | FILES:
-      continue
-    if entry.is_symlink():
-      raise ValueError("El paquete contiene un enlace simbólico: " + entry.name)
-    candidates = [entry] if entry.is_file() else entry.rglob("*")
-    for path in candidates:
-      relative = path.relative_to(ROOT)
-      if any(part.startswith(".") or part == "__pycache__" for part in relative.parts[1:]):
-        continue
-      if path.is_symlink():
-        raise ValueError("El paquete contiene un enlace simbólico: " + str(relative))
-      if not path.is_file() or (path.suffix not in SUFFIXES and path.name not in FILES | {"qmldir"} and relative.as_posix() not in {"bin/hyprlarp", "bin/hyprlarp-greeter"}):
-        continue
-      target = destination / relative
-      target.parent.mkdir(parents=True, exist_ok=True)
-      shutil.copy2(path, target)
-      result[relative.as_posix()] = digest(target)
+  for name, source in selected_sources(ROOT).items():
+    target = destination / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    result[name] = digest(target)
   return result
 
 
@@ -171,7 +157,10 @@ def load_manifest(locations):
     raise ValueError("El manifiesto no contiene los archivos gestionados")
   for name, value in manifest["files"].items():
     relative = Path(name)
-    if relative.is_absolute() or ".." in relative.parts or not relative.parts or any(part.startswith(".") for part in relative.parts if part not in FILES):
+    hidden = any(part.startswith(".") and part not in FILES and not (
+      index == 0 and part == ".github" and len(relative.parts) >= 3 and relative.parts[1] == "workflows")
+      for index, part in enumerate(relative.parts))
+    if relative.is_absolute() or ".." in relative.parts or not relative.parts or hidden:
       raise ValueError("Ruta no válida en el manifiesto")
     if not isinstance(value, str) or len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
       raise ValueError("Hash de archivo no válido")

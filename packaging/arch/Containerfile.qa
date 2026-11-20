@@ -1,0 +1,9 @@
+# Runtime dependencies match tools/package.py; no build toolchain or user state.
+FROM archlinux:base
+RUN pacman -Syu --noconfirm --needed \
+      python quickshell hyprland qt6-declarative qt6-svg qt6-wayland qt6-imageformats \
+      python-gobject python-pillow libnm systemd inter-font ttf-jetbrains-mono ttf-dejavu \
+      git nodejs lua imagemagick dbus \
+    && pacman -Scc --noconfirm
+WORKDIR /tmp
+CMD ["/usr/bin/bash"]

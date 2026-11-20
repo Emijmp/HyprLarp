@@ -1,5 +1,5 @@
 .RECIPEPREFIX := >
-.PHONY: run preview settings check install uninstall
+.PHONY: run preview settings check install uninstall package release-check
 
 run:
 > ./bin/hyprlarp run
@@ -18,3 +18,9 @@ install:
 
 uninstall:
 > ./bin/hyprlarp uninstall
+
+package:
+> python3 tools/package.py build --output .runtime/package
+
+release-check:
+> python3 tools/release.py check

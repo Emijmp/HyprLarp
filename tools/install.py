@@ -17,6 +17,10 @@ sys.path.insert(0, str(ROOT))
 from backend.service import Store, generate_bindings, lua_string, read_regular
 from backend.gaps import render as render_window_gaps
 from backend import recovery
+try:
+  from .integration import contents as integration_contents
+except ImportError:
+  from integration import contents as integration_contents
 
 ACTIVE_FILES = {'settings', 'bindings', 'gaps', 'idle'}
 
@@ -103,36 +107,8 @@ def _install(locations, dry_run=False):
         (folder / 'settings.json').write_bytes(read_regular(current))
       settings = Store(folder).settings
     executable, config = locations.executable, locations.config
-    contents = {
-      'launcher': '#!/bin/sh\nexec ' + shlex.quote(str(locations.app / 'bin/hyprlarp')) + ' "$@"\n',
-      'settings': json.dumps(settings, ensure_ascii=False, indent=2) + '\n',
-      'bindings': generate_bindings(settings, executable),
-      'gaps': render_window_gaps(settings),
-      'prelude': '-- Load before your existing binds in hyprland.lua.\n'
-        + 'local manager = dofile(' + lua_string(str(locations.app / 'config/bindings-runtime.lua')) + ')\n'
-        + 'manager.begin(' + lua_string(str(locations.app / 'config/bindings-runtime.lua')) + ')\n',
-      'session': '-- Load from hyprland.lua using dofile().\n'
-        + 'dofile(' + lua_string(str(config / 'bindings.lua')) + ')\n'
-        + 'local loadWindowGaps = dofile(' + lua_string(str(locations.app / 'config/window-gaps-loader.lua')) + ')\n'
-        + 'HyprLarpApplyWindowGaps = function()\n'
-        + '  loadWindowGaps(' + lua_string(str(config / 'window-gaps.conf')) + ')\n'
-        + 'end\n'
-        + 'HyprLarpApplyWindowGaps()\n'
-        + 'hl.on("hyprland.start", function()\n'
-        + '  hl.exec_cmd(' + lua_string(shlex.quote(str(executable)) + ' start') + ')\n'
-        + '  hl.exec_cmd(' + lua_string('hypridle -c ' + shlex.quote(str(config / 'hypridle.conf'))) + ')\n'
-        + 'end)\n',
-      'idle': 'general {\n  lock_cmd = ' + shlex.quote(str(executable)) + ' lock\n'
-        + '  before_sleep_cmd = loginctl lock-session\n'
-        + '  after_sleep_cmd = hyprctl dispatch \'hl.dsp.dpms({action = "on"})\'\n'
-        + '  inhibit_sleep = 3\n}\n',
-      'desktop': '[Desktop Entry]\nType=Application\nName=HyprLarp Settings\n'
-        + 'Name[es]=Configuración de HyprLarp\nComment=Personaliza tu escritorio\n'
-        + 'Exec=env ' + desktop_word(str(executable)) + ' settings\nIcon=hyprlarp\nTerminal=false\nCategories=Settings;DesktopSettings;\n',
-      'icon': (ROOT / 'assets/hyprlarp-desktop.svg').read_text(),
-      'service': recovery.render_unit(executable, locations.app),
-    }
-    contents = {role: text.encode('utf-8') for role, text in contents.items()}
+    contents = integration_contents(locations.app, config, executable, settings,
+      icon=(ROOT / 'assets/hyprlarp-desktop.svg').read_text())
     contents, managed = plan_managed(locations, contents, previous)
     manifest = {'type': 'hyprlarp-install', 'version': 1, 'release': read_version(stage), 'first_run': first_run,
       'prefix': locations.prefix, 'files': files,

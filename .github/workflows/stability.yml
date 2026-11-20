@@ -1,0 +1,62 @@
+name: Estabilidad prolongada
+
+on:
+  schedule:
+    - cron: '23 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duración en segundos (60–7200)'
+        default: '7200'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stability-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Instalar entorno de prueba
+        run: pacman -Syu --noconfirm --needed git python python-pillow quickshell qt6-declarative qt6-svg qt6-wayland qt6-imageformats python-gobject libnm hyprland dbus inter-font ttf-jetbrains-mono ttf-dejavu
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preparar usuario y duración
+        env:
+          REQUESTED_DURATION: ${{ inputs.duration || '7200' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          value = os.environ['REQUESTED_DURATION']
+          if not value.isdecimal() or not 60 <= int(value) <= 7200:
+              raise SystemExit('La duración debe ser un entero entre 60 y 7200')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('SOAK_DURATION=' + value + '\n')
+          PY
+          useradd --create-home --user-group hyprlarp-stability
+          mkdir -p .runtime/stability
+          chown -R hyprlarp-stability:hyprlarp-stability "$GITHUB_WORKSPACE"
+      - name: Ejercitar paneles, temas y recuperación del backend
+        run: runuser -u hyprlarp-stability -- dbus-run-session -- python3 tools/soak.py --duration "$SOAK_DURATION" --warmup 30 --output .runtime/stability/run
+      - name: Conservar informe y muestras
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: hyprlarp-stability
+          path: |
+            .runtime/stability/run/result.json
+            .runtime/stability/run/samples.jsonl
+            .runtime/stability/run/quickshell.log
+          if-no-files-found: warn
+          retention-days: 14

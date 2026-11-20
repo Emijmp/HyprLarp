@@ -54,7 +54,7 @@ def main() -> int:
   from backend.version import VERSION
   parser = argparse.ArgumentParser(description="HyprLarp · shell para Hyprland")
   parser.add_argument("--version", action="version", version="HyprLarp " + VERSION)
-  parser.add_argument("command", nargs="?", default="run", choices=["run", "start", "stop", "ready", "session-check", "recover", "retry", "preview", "settings", "welcome", "toggle", "close", "lock", "screenshot-region", "screenshot-region-frozen", "screenshot-screen", "screenshot-window", "doctor", "install", "uninstall"])
+  parser.add_argument("command", nargs="?", default="run", choices=["run", "start", "stop", "ready", "session-check", "recover", "retry", "preview", "settings", "welcome", "toggle", "close", "lock", "screenshot-region", "screenshot-region-frozen", "screenshot-screen", "screenshot-window", "doctor", "setup", "teardown", "install", "uninstall"])
   parser.add_argument("panel", nargs="?", choices=sorted(PANELS))
   parser.add_argument("--dry-run", action="store_true", help="Mostrar los archivos de instalación")
   parser.add_argument("--prefix", type=Path, help="Directorio de una instalación aislada")
@@ -68,11 +68,24 @@ def main() -> int:
     parser.error("--freeze solo se admite con los comandos screenshot-*")
   if args.command == "doctor":
     return doctor(json_output=args.json, report_path=args.report, include_logs=not args.no_logs)
-  if args.purge and args.command != "uninstall":
-    parser.error("--purge solo se admite con uninstall")
-  if args.command in {"install", "uninstall"}:
+  if args.purge and args.command not in {"uninstall", "teardown"}:
+    parser.error("--purge solo se admite con uninstall o teardown")
+  packaged = (ROOT / ".hyprlarp-package.json").is_file()
+  if args.command in {"install", "uninstall", "setup", "teardown"}:
+    operation = "install" if args.command in {"install", "setup"} else "uninstall"
+    if packaged:
+      from tools import session_setup
+      if operation == "install":
+        session_setup.setup(ROOT, prefix=args.prefix, dry_run=args.dry_run)
+      else:
+        session_setup.teardown(ROOT, prefix=args.prefix, dry_run=args.dry_run, purge=args.purge)
+      return 0
     options = (["--dry-run"] if args.dry_run else []) + (["--prefix", str(args.prefix)] if args.prefix else []) + (["--purge"] if args.purge else [])
-    return subprocess.call([sys.executable, str(ROOT / ("tools/" + args.command + ".py"))] + options)
+    return subprocess.call([sys.executable, str(ROOT / ("tools/" + operation + ".py"))] + options)
+  if packaged and args.command in {"run", "start", "settings", "welcome"}:
+    from tools import session_setup
+    if not session_setup.ready(ROOT):
+      session_setup.setup(ROOT)
   sys.path.insert(0, str(ROOT))
   if args.command == "session-check":
     from backend.recovery import session_alive
@@ -87,14 +100,16 @@ def main() -> int:
     if args.command == "start":
       # The installed user launcher is the stable entry point used by the unit.
       config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-      executable = Path(os.environ.get("HYPRLARP_EXECUTABLE", Path.home() / ".local/bin/hyprlarp"))
+      default_executable = ROOT.parents[1] / "bin/hyprlarp" if packaged else Path.home() / ".local/bin/hyprlarp"
+      executable = Path(os.environ.get("HYPRLARP_EXECUTABLE", default_executable))
       recovery.start(ROOT, executable, binary, destination=recovery.unit_path(config))
     elif args.command == "stop":
       recovery.stop(ROOT, binary)
     else:
       recovery.wait_ready(ROOT, binary, timeout=50)
     return 0
-  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(Path(__file__).resolve()), "PYTHONDONTWRITEBYTECODE": "1", "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1"}
+  entry_executable = ROOT.parents[1] / "bin/hyprlarp" if packaged else Path(__file__).resolve()
+  environment = {**os.environ, "HYPRLARP_EXECUTABLE": str(entry_executable), "PYTHONDONTWRITEBYTECODE": "1", "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1"}
   sys.path.insert(0, str(ROOT))
   from backend.icons import choose_icon_theme
   icon_theme = choose_icon_theme(environment)

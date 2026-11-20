@@ -11,6 +11,7 @@ Scope {
   property int step: 0
   property var initialPanel: ({})
   property int scaleStep: 0
+  property real initialCardHeight: 0
   function verify(condition, message) {
     if (!condition)
       throw new Error("Visual regression: " + message);
@@ -53,6 +54,11 @@ Scope {
         return;
       switch (root.step) {
       case 0:
+        {
+          const card = root.find(page, "theme-preview-card");
+          root.verify(card && card.implicitHeight > 0, "theme card is laid out before scaling");
+          root.initialCardHeight = card.implicitHeight;
+        }
         Bridge.configurationWindow("visual-check", true);
         root.initialPanel = Object.assign({}, page.panelDraft.saved);
         page.editPanel("panelLayout", "sidebar");
@@ -142,7 +148,7 @@ Scope {
           const preview = root.find(page, "panel-design-preview");
           const card = root.find(page, "theme-preview-card");
           root.verify(preview && card, "both preview types are instantiated");
-          root.verify(card.implicitHeight > 240, "theme cards grow with large text instead of clipping into a fixed height");
+          root.verify(card.implicitHeight > root.initialCardHeight, "theme cards grow with large text instead of clipping into a fixed height");
           for (const mode of ["floating", "centered", "sidebar"]) {
             preview.layoutMode = mode;
             const geometry = preview.surfaceGeometry;

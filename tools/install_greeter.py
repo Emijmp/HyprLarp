@@ -27,7 +27,7 @@ from backend.version import VERSION
 from tools.greeter_lifecycle import Snapshot, locked, fingerprint
 
 UNIT = 'hyprlarp-greeter-sync'
-SYNC_FILES = ['backend/greeter.py', 'backend/theme_context.py', 'config/palettes.json',
+SYNC_FILES = ['backend/greeter.py', 'backend/theme_context.py', 'config/palettes.json', 'tools/__init__.py',
   'tools/install_greeter.py', 'tools/greeter_lifecycle.py']
 UI_FILES = ['greeter/' + name for name in ['shell.qml', 'BrandIcon.qml', 'ControlButton.qml', 'Controller.qml',
   'GreeterView.qml', 'SessionChoice.qml', 'model.py', 'branding.js']] + ['assets/' + name for name in

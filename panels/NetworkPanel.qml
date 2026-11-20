@@ -164,12 +164,14 @@ ColumnLayout {
     }
   }
   EmptyState {
+    objectName: "network-empty"
     visible: (Bridge.network.networks || []).length === 0
     error: !Bridge.network.available || !!Bridge.network.error
     title: !Bridge.network.available ? "NetworkManager no disponible" : Bridge.network.enabled ? "Sin redes disponibles" : "Wi-Fi desactivado"
-    description: Bridge.network.available ? "Activa el adaptador y pulsa Buscar." : "Comprueba que NetworkManager esté iniciado."
+    description: !Bridge.network.available ? "Comprueba que NetworkManager esté iniciado." : Bridge.network.enabled ? "Pulsa Buscar para actualizar la lista. Comprueba que haya una red dentro del alcance." : "Activa el adaptador y pulsa Buscar."
   }
   ActionButton {
+    objectName: "network-manager"
     text: "VPN / redes empresariales"
     onClicked: Bridge.perform("open-tool", {
       name: "network"

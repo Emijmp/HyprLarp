@@ -21,12 +21,16 @@ jobs:
       matrix:
         python: ['3.11', '3.14']
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ matrix.python }}
       - name: Instalar comprobadores de JavaScript y Lua
-        run: sudo apt-get update && sudo apt-get install -y nodejs lua5.4
+        run: sudo apt-get update && sudo apt-get install -y nodejs lua5.4 libarchive-tools
+      - name: Instalar el decodificador del analizador aislado
+        run: python -m pip install --disable-pip-version-check 'Pillow>=9.1'
       - name: Probar lógica, persistencia e instalación aislada
         run: python tools/check.py --backend-only
 
@@ -39,8 +43,10 @@ jobs:
         shell: bash
     steps:
       - name: Instalar el entorno de escritorio de prueba
-        run: pacman -Syu --noconfirm --needed git python python-gobject libnm quickshell qt6-declarative qt6-svg qt6-wayland imagemagick nodejs lua hyprland dbus
-      - uses: actions/checkout@v6
+        run: pacman -Syu --noconfirm --needed git python python-gobject python-pillow libnm quickshell qt6-declarative qt6-svg qt6-wayland qt6-imageformats imagemagick nodejs lua hyprland dbus inter-font ttf-jetbrains-mono ttf-dejavu
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Preparar usuario de prueba sin privilegios
         run: |
           useradd --create-home --user-group hyprlarp-ci
@@ -58,9 +64,72 @@ jobs:
         run: runuser -u hyprlarp-ci -- python3 tools/benchmark.py --seconds 15 --output .runtime/ci/performance.json
       - name: Conservar registros de la comprobación
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: hyprlarp-checks
           path: .runtime/ci/
           retention-days: 14
           include-hidden-files: true
+
+  package-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Instalar herramientas y dependencias declaradas
+        run: pacman -Syu --noconfirm --needed base-devel git python quickshell hyprland qt6-declarative qt6-svg qt6-wayland qt6-imageformats python-gobject python-pillow libnm inter-font ttf-jetbrains-mono ttf-dejavu nodejs lua imagemagick dbus
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Preparar constructor sin privilegios
+        run: |
+          useradd --create-home --user-group hyprlarp-builder
+          mkdir -p .runtime/distribution/base .runtime/distribution/upgrade
+          chown -R hyprlarp-builder:hyprlarp-builder "$GITHUB_WORKSPACE"
+      - name: Construir dos revisiones para probar una actualización real
+        run: |
+          runuser -u hyprlarp-builder -- python3 tools/package.py build --output .runtime/distribution/base
+          runuser -u hyprlarp-builder -- python3 tools/package.py build --output .runtime/distribution/upgrade --pkgrel 2 --nocheck
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: hyprlarp-distribution
+          path: .runtime/distribution/**/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  package-clean:
+    needs: package-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: hyprlarp-distribution
+          path: .runtime/distribution
+      - name: Crear una raíz nueva con dependencias de ejecución y pruebas
+        run: docker build --tag hyprlarp-clean -f packaging/arch/Containerfile.qa .
+      - name: Instalar, actualizar, probar y retirar el paquete sin red
+        run: |
+          mkdir -p .runtime/clean-ci
+          docker run --rm --network none \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE/.runtime/clean-ci,target=/results" \
+            hyprlarp-clean /usr/bin/bash -c \
+            'python3 /source/tools/clean_check.py --container --package /source/.runtime/distribution/base/hyprlarp-*.pkg.tar.zst --upgrade-package /source/.runtime/distribution/upgrade/hyprlarp-*.pkg.tar.zst --output /results'
+      - name: Conservar informe y registros
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: hyprlarp-clean-install
+          path: |
+            .runtime/clean-ci/report.json
+            .runtime/clean-ci/*.log
+          retention-days: 14
+          if-no-files-found: warn

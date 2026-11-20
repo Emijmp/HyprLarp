@@ -15,9 +15,10 @@ ColumnLayout {
     font.pixelSize: Theme.fontPx(11)
   }
   StatMeter {
+    objectName: "resource-cpu"
     title: "CPU"
     value: Bridge.system.cpu || 0
-    detail: Bridge.system.cpu === undefined ? "N/D" : Math.round(Bridge.system.cpu) + "%"
+    detail: Bridge.system.cpu === null || Bridge.system.cpu === undefined ? "N/D" : Math.round(Bridge.system.cpu) + "%"
   }
   StatMeter {
     title: "Memoria"

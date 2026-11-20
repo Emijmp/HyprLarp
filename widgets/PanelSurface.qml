@@ -130,6 +130,7 @@ Rectangle {
     Rule {}
     ScrollView {
       id: scroll
+      objectName: "panel-scroll"
       Layout.fillWidth: true
       Layout.fillHeight: true
       clip: true
@@ -139,6 +140,7 @@ Rectangle {
       ScrollBar.vertical: SlimScrollBar {}
       GuardedLoader {
         id: panelLoader
+        objectName: "panel-content-loader"
         moduleId: "panel:" + root.panel
         asynchronous: true
         property double loadStarted: 0

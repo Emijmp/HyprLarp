@@ -35,6 +35,18 @@ El [asistente de primera ejecución](docs/first-run.md) ayuda a elegir tema, dis
 
 El shell, el backend y el greeter comparten una [versión de publicación](docs/versioning.md) definida en `VERSION`. Consulta `hyprlarp --version` o `hyprlarp-greeter --version` sin necesitar una sesión gráfica.
 
+La [guía de empaquetado para Arch/CachyOS](docs/packaging.md) permite generar un paquete
+con `make package`. El código se instala una sola vez en `/usr/share/hyprlarp`;
+`hyprlarp setup` prepara la integración de cada usuario y conserva sus ajustes.
+El greeter se activa por separado. Las [publicaciones automatizadas](docs/releasing.md)
+comprueban la versión y preparan un borrador con fuentes, paquete y SHA-256.
+
+La [prueba prolongada](docs/stability.md) ejercita paneles y temas durante dos horas,
+con reinicios controlados de su backend aislado. La [validación en un sistema limpio](docs/clean-validation.md)
+instala, actualiza y retira el paquete real en una raíz privada, conservando preferencias
+y binds activos. La [revisión final de experiencia](docs/release-ux.md) documenta teclado,
+errores legibles y las comprobaciones físicas que necesitan una sesión de prueba.
+
 Para iniciar el shell real desde este checkout:
 
 ```sh
@@ -209,9 +221,9 @@ Las configuraciones anteriores se migran sin reescribir el archivo hasta que gua
 `doctor` comprueba qué herramientas están instaladas. Solo necesitas las correspondientes a los módulos que uses.
 
 ```sh
-sudo pacman -S quickshell qt6-declarative qt6-svg python python-pillow networkmanager bluez bluez-utils \
+sudo pacman -S quickshell qt6-declarative qt6-svg qt6-wayland qt6-imageformats python python-pillow networkmanager bluez bluez-utils \
   wireplumber brightnessctl wl-clipboard cliphist grim slurp hyprpicker hyprlock hypridle \
-  playerctl imagemagick pipewire-audio inter-font ttf-jetbrains-mono
+  playerctl imagemagick pipewire-audio inter-font ttf-jetbrains-mono ttf-dejavu
 ```
 
 Editores opcionales:

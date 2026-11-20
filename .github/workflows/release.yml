@@ -1,0 +1,106 @@
+name: Preparar publicación
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Etiqueta existente vVERSION que se quiere preparar
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container: archlinux:base
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Instalar herramientas y dependencias de comprobación
+        run: pacman -Syu --noconfirm --needed base-devel git python python-gobject python-pillow libnm quickshell qt6-declarative qt6-svg qt6-wayland qt6-imageformats imagemagick nodejs lua hyprland dbus inter-font ttf-jetbrains-mono ttf-dejavu
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Preparar usuario sin privilegios
+        run: |
+          useradd --create-home --user-group hyprlarp-release
+          mkdir -p .runtime/release
+          chown -R hyprlarp-release:hyprlarp-release "$GITHUB_WORKSPACE"
+      - name: Validar versión, etiqueta y cambios
+        run: |
+          runuser -u hyprlarp-release -- python3 tools/release.py check --tag "$RELEASE_TAG" --verify-git
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$(runuser -u hyprlarp-release -- git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Comprobar lógica e interfaz
+        run: runuser -u hyprlarp-release -- dbus-run-session -- python3 tools/check.py
+      - name: Construir paquete Arch
+        run: runuser -u hyprlarp-release -- python3 tools/package.py build --output "$GITHUB_WORKSPACE/.runtime/release"
+      - name: Comprobar contenido y generar sumas
+        run: |
+          for package in .runtime/release/hyprlarp-*.pkg.tar.zst; do
+            runuser -u hyprlarp-release -- python3 tools/package.py verify "$package"
+          done
+          runuser -u hyprlarp-release -- python3 tools/release.py prepare --tag "$RELEASE_TAG" --verify-git --output .runtime/release
+          runuser -u hyprlarp-release -- python3 tools/release.py verify .runtime/release
+      - name: Conservar los artefactos para revisión
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: hyprlarp-release
+          path: |
+            .runtime/release/hyprlarp-*.tar.gz
+            .runtime/release/hyprlarp-*.pkg.tar.zst
+            .runtime/release/PKGBUILD
+            .runtime/release/SHA256SUMS
+            .runtime/release/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      GH_PROMPT_DISABLED: '1'
+      GH_NO_UPDATE_NOTIFIER: '1'
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: hyprlarp-release
+          path: artifacts
+      - name: Verificar artefactos descargados
+        working-directory: artifacts
+        run: sha256sum --check SHA256SUMS
+      - name: Crear o actualizar únicamente el borrador
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=(artifacts/hyprlarp-*.tar.gz artifacts/hyprlarp-*.pkg.tar.zst artifacts/PKGBUILD artifacts/SHA256SUMS artifacts/RELEASE_NOTES.md)
+          if draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft'); then
+            if [[ "$draft" != true ]]; then
+              echo 'La publicación ya es pública; no se modificará.' >&2
+              exit 1
+            fi
+            gh release edit "$RELEASE_TAG" --draft --title "HyprLarp ${RELEASE_TAG#v}" --notes-file artifacts/RELEASE_NOTES.md
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}" --verify-tag --draft --title "HyprLarp ${RELEASE_TAG#v}" --notes-file artifacts/RELEASE_NOTES.md
+          fi
