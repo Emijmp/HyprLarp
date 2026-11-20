@@ -1,5 +1,13 @@
 # Cambios de HyprLarp
 
+## [0.1.1] - 2026-11-19
+
+- Las pruebas del panel de rendimiento esperan la confirmación de arranque del
+  backend antes de cargar informes de ejemplo, evitando que el historial inicial
+  los reemplace durante la comprobación. Se verifican también arranques retrasados.
+- Las comprobaciones nativas de Lua, espacios y atajos usan un runtime temporal
+  propio; los workflows preparan `XDG_RUNTIME_DIR` para sus usuarios de pruebas.
+
 ## [0.1.0] - 2026-11-19
 
 - Shell modular para Hyprland: barra, launcher, notificaciones, portapapeles,

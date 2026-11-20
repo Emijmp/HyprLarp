@@ -72,6 +72,11 @@ de la etiqueta original. Así puede reconstruirse esa publicación sin mover la
 etiqueta ni cambiar sus fuentes. Reejecutar el run anterior utiliza el workflow
 anterior; no incorpora la corrección de `main`.
 
+Si el arreglo modifica las fuentes o sus pruebas, prepara una nueva versión en
+`VERSION` y `CHANGELOG.md` y publica su nueva etiqueta. Por ejemplo, los cambios
+posteriores a `v0.1.0` se publican como `v0.1.1`. Reconstruir `v0.1.0` sigue usando
+sus pruebas anteriores; el entorno actualizado no incorpora cambios de fuentes.
+
 SHA-256 permite comprobar que una descarga conserva los bytes preparados. No es
 una firma del paquete ni acredita por sí sola su autoría; esta primera preparación
 no incorpora claves privadas ni firma con credenciales locales.

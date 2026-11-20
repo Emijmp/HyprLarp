@@ -10,10 +10,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(shutil.which('quickshell'), 'Quickshell is unavailable')
 class PanelBehaviorTests(unittest.TestCase):
-  def run_qml(self, contents, *, clipboard_native_branch=False):
+  def run_qml(self, contents, *, clipboard_native_branch=False, performance_ready_delay=0):
     with tempfile.TemporaryDirectory(prefix='hyprlarp-panels-') as folder:
       app = Path(folder)
-      (app / 'backend').symlink_to(ROOT / 'backend', target_is_directory=True)
+      if performance_ready_delay:
+        # Keep the real service, but delay its initial performance snapshot so
+        # synthetic panel data cannot accidentally rely on a fast CI machine.
+        (app / 'backend').mkdir()
+        (app / 'backend/service.py').write_text(
+          'import sys, time\n'
+          + 'sys.path.insert(0, ' + repr(str(ROOT)) + ')\n'
+          + 'from backend import service\n'
+          + 'original = service.Service.action\n'
+          + 'def delayed(self, request):\n'
+          + '  if request.get("action") == "performance-ready":\n'
+          + '    time.sleep(' + repr(performance_ready_delay) + ')\n'
+          + '  return original(self, request)\n'
+          + 'service.Service.action = delayed\n'
+          + 'service.main()\n')
+      else:
+        (app / 'backend').symlink_to(ROOT / 'backend', target_is_directory=True)
       imports = '\n'.join('import "' + (ROOT / name).as_uri() + '" as ' + alias
         for name, alias in [('core', 'Core'), ('widgets', 'Widgets'), ('panels', 'Panels')])
       if clipboard_native_branch:
@@ -87,6 +103,13 @@ import Quickshell
     self.run_qml('''ShellRoot {
       id: root
       property int step: 0
+      property bool performanceReady: false
+      Connections {
+        target: Core.Bridge
+        function onActionFinished(action) {
+          if (action === "performance-ready") root.performanceReady = true;
+        }
+      }
       function rows(item, prefix) {
         let count = 0;
         if (item.text && String(item.text).startsWith(prefix) && item.visible) count++;
@@ -101,7 +124,7 @@ import Quickshell
       Timer {
         interval: 100; repeat: true; running: true
         onTriggered: {
-          if (!Core.Bridge.ready) return;
+          if (!Core.Bridge.ready || !root.performanceReady) return;
           if (root.step++ === 0) {
             Core.Bridge.performance = {mode: "preview", current: {parts: [{role: "backend", pid: 123, cpuPercent: 3, rssMiB: 40}]},
               history: [], panelLoads: [{name: "control", milliseconds: 8}], samples: [], cpuTickMs: 10};
@@ -113,13 +136,20 @@ import Quickshell
           console.log("PANEL CHECK COMPLETE"); stop(); Qt.quit();
         }
       }
-    }''')
+    }''', performance_ready_delay=.08)
 
   def test_filtered_performance_comparison_survives_unrelated_history_updates(self):
-    self.run_qml('''ShellRoot {
+    contents = '''ShellRoot {
       id: root
       property int step: 0
       property string selected: ""
+      property bool performanceReady: false
+      Connections {
+        target: Core.Bridge
+        function onActionFinished(action) {
+          if (action === "performance-ready") root.performanceReady = true;
+        }
+      }
       function verify(value, label) { if (!value) { console.error(label); Qt.quit(); throw new Error(label); } }
       function report(id, label, at) {
         return {id: id, label: label, createdAt: at, revision: "123456789abc", context: {mode: "preview", fingerprint: "same"},
@@ -133,7 +163,7 @@ import Quickshell
       Timer {
         interval: 100; repeat: true; running: true
         onTriggered: {
-          if (!Core.Bridge.ready) return;
+          if (!Core.Bridge.ready || !root.performanceReady) return;
           switch (root.step++) {
           case 0:
             root.update([root.report("a", "Coincide A", 1000), root.report("b", "Coincide B", 2000)]);
@@ -154,7 +184,10 @@ import Quickshell
           }
         }
       }
-    }''')
+    }'''
+    for delay in [0, .08, .35]:
+      with self.subTest(performance_ready_delay=delay):
+        self.run_qml(contents, performance_ready_delay=delay)
 
   def test_bad_cached_clipboard_image_does_not_trigger_an_endless_retry(self):
     self.run_qml('''ShellRoot {
