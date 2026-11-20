@@ -135,6 +135,14 @@ class Captures:
       subprocess.run(["wl-copy", "--type", "image/png"], stdin=handle, check=True, timeout=5)
     self.s.emit("message", "Captura guardada y copiada: " + path.name)
 
+  def notify_saved(self, path):
+    # The saved image is complete even if the clipboard has become unavailable.
+    # A failed copy must not leave the editor offering to save it a second time.
+    try:
+      self.copy(path)
+    except (OSError, RuntimeError, subprocess.SubprocessError):
+      self.s.emit("message", "Captura guardada: " + path.name + " · no se pudo copiar al portapapeles")
+
   def capture(self, data):
     mode = data.get("mode", "region")
     if mode not in {"region", "screen", "window"}:
@@ -149,6 +157,9 @@ class Captures:
       raise RuntimeError("Ya hay una captura en curso; termina o cancela con Esc")
     path, published = None, False
     try:
+      with self.lock:
+        if annotate and self.drafts:
+          raise RuntimeError("Termina o descarta la captura abierta en el editor antes de editar otra")
       argv = ["grim"]
       # Resolve the active window before the freeze helper takes keyboard focus.
       if mode == "window":
@@ -185,7 +196,7 @@ class Captures:
       else:
         # A clipboard error must not remove an otherwise successfully saved PNG.
         published = True
-        self.copy(path)
+        self.notify_saved(path)
     finally:
       try:
         if path is not None and not published:
@@ -221,8 +232,14 @@ class Captures:
             raise ValueError("El recorte está fuera de la imagen")
           argv += ["-crop", f"{w}x{h}+{x}+{y}", "+repage"]
         destination = self.destination()
-        self.api.command(argv + [str(destination)], timeout=15)
-        self.copy(destination)
+        converted = False
+        try:
+          self.api.command(argv + [str(destination)], timeout=15)
+          converted = True
+        finally:
+          if not converted:
+            destination.unlink(missing_ok=True)
+        self.notify_saved(destination)
       draft["path"].unlink(missing_ok=True)
       (self.directory / (token + ".svg")).unlink(missing_ok=True)
       del self.drafts[token]

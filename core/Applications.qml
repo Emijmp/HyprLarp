@@ -43,11 +43,21 @@ Singleton {
       return Quickshell.iconPath(name);
     if (Bridge.appIcons[name] !== undefined)
       return Bridge.appIcons[name] || fallbackIcon;
-    if (!requestedIcons.has(name)) {
+    if (!requestedIcons.has(name) && Bridge.connected) {
       pendingIcons.add(name);
       resolveTimer.restart();
     }
     return fallbackIcon;
+  }
+  Connections {
+    target: Bridge
+    function onConnectedChanged() {
+      if (!Bridge.connected) {
+        resolveTimer.stop();
+        root.pendingIcons.clear();
+        root.requestedIcons = new Set();
+      }
+    }
   }
   Timer {
     id: resolveTimer

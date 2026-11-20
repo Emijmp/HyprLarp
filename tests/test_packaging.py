@@ -1,6 +1,7 @@
 """Archives and staged Arch payloads preserve provenance without host changes."""
 
 import hashlib
+import gzip
 import io
 import json
 import os
@@ -112,6 +113,24 @@ class PackagingTests(unittest.TestCase):
     with self.assertRaises(ValueError):
       package.source_archive(self.base / 'source.tar.gz', root=root)
 
+  def test_source_verifier_checks_gzip_trailer_and_bounds_trailing_members(self):
+    root = self.base / 'source'
+    root.mkdir()
+    (root / 'VERSION').write_text('1.2.3\n')
+    source = package.source_archive(self.base / 'source.tar.gz', root=root, epoch=123)
+    self.assertEqual(package.verify_source_archive(source, root=root)['source_date_epoch'], 123)
+    original = source.read_bytes()
+    crc = bytearray(original)
+    crc[-8] ^= 1
+    for content in [original[:-1], original[:-8], bytes(crc)]:
+      with self.subTest(size=len(content)):
+        source.write_bytes(content)
+        with self.assertRaisesRegex(ValueError, 'tar.gz válido'):
+          package.verify_source_archive(source, root=root)
+    source.write_bytes(original + gzip.compress(b'\0' * (128 * 1024)))
+    with self.assertRaisesRegex(ValueError, 'datos adicionales'):
+      package.verify_source_archive(source, root=root)
+
   def test_prepare_pins_the_source_hash_and_honors_source_date_epoch(self):
     destination = self.base / 'prepared'
     with patch.dict(os.environ, {'SOURCE_DATE_EPOCH': '1234567890'}):
@@ -125,6 +144,34 @@ class PackagingTests(unittest.TestCase):
     with tarfile.open(source) as archive:
       self.assertTrue(all(item.mtime == 1234567890 for item in archive.getmembers()))
       self.assertIn('hyprlarp-' + metadata['release'] + '/packaging/arch/PKGBUILD.in', archive.getnames())
+
+  def test_prepare_refuses_symlink_artifacts_before_overwriting_anything(self):
+    for name in ['PKGBUILD', 'build-info.json']:
+      with self.subTest(name=name):
+        output = self.base / name.replace('.', '-')
+        output.mkdir()
+        victim = self.base / ('outside-' + name)
+        victim.write_text('preserve')
+        (output / name).symlink_to(victim)
+        with self.assertRaisesRegex(ValueError, 'enlaces simbólicos'):
+          package.prepare(output)
+        self.assertEqual(victim.read_text(), 'preserve')
+        self.assertEqual(list(output.iterdir()), [output / name])
+
+  def test_prepare_writes_recipe_and_metadata_atomically(self):
+    output = self.base / 'prepared'
+    package.prepare(output)
+    old = {name: (output / name).read_bytes() for name in ['PKGBUILD', 'build-info.json']}
+    real_replace = package.os.replace
+    def fail_recipe(source, destination):
+      if Path(destination).name == 'PKGBUILD':
+        raise OSError('simulated interruption')
+      return real_replace(source, destination)
+    with patch.object(package.os, 'replace', side_effect=fail_recipe), self.assertRaises(OSError):
+      package.prepare(output, pkgrel=2)
+    for name, data in old.items():
+      self.assertEqual((output / name).read_bytes(), data)
+    self.assertFalse(list(output.glob('.hyprlarp-artifact-*')))
 
   def test_arch_version_keeps_common_prereleases_below_the_final_release(self):
     self.assertEqual(package.arch_version('1.2.3+arch.1'), '1.2.3')

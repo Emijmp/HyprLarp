@@ -6,7 +6,11 @@ import Quickshell.Services.Notifications
 
 Singleton {
   id: root
-  property var history: Bridge.history
+  property var history: []
+  property bool historyInitialized: false
+  property bool historyDirty: false
+  property bool readStoredHistory: false
+  property bool discardStoredHistory: false
   property var popups: []
   property var deadlines: ({})
   property var liveTokens: ({})
@@ -39,14 +43,38 @@ Singleton {
       }
     }
   }
-  Component.onCompleted: batteryWarnings()
+  function loadHistory(entries) {
+    if (!historyInitialized) {
+      const received = new Set(history.map(item => item.token));
+      const stored = discardStoredHistory ? [] : entries.filter(item => !received.has(item.token)).map(item => readStoredHistory ? Object.assign({}, item, {read: true}) : item);
+      history = history.concat(stored).slice(0, Bridge.settings.notificationHistoryLimit ?? 100);
+      historyInitialized = true;
+      if (historyDirty)
+        persist();
+    } else if (historyDirty || JSON.stringify(history) !== JSON.stringify(entries)) {
+      // The in-memory history remains authoritative after a backend restart.
+      // Replay edits that had not reached disk, without restoring removed rows.
+      persist();
+    }
+  }
+  Component.onCompleted: {
+    if (Bridge.notificationHistoryReady)
+      loadHistory(Bridge.history);
+    batteryWarnings();
+  }
   Connections {
     target: Bridge
     function onBatteryAlertsChanged() { root.batteryWarnings(); }
+    function onHistoryLoaded(entries) { root.loadHistory(entries); }
+    function onConnectedChanged() {
+      if (!Bridge.connected)
+        persistTimer.stop();
+    }
   }
   readonly property int unread: history.filter(n => !n.read).length
   function persist() {
-    if (!persistTimer.running)
+    historyDirty = true;
+    if (historyInitialized && Bridge.connected && Bridge.notificationHistoryReady && !persistTimer.running)
       persistTimer.start();
   }
   function forget(id) {
@@ -213,6 +241,8 @@ Singleton {
     return n ? Array.prototype.slice.call(n.actions, 0, 8) : [];
   }
   function markRead() {
+    if (!historyInitialized)
+      readStoredHistory = true;
     history = history.map(n => Object.assign({}, n, {
         read: true
       }));
@@ -223,6 +253,8 @@ Singleton {
     persist();
   }
   function clear() {
+    if (!historyInitialized)
+      discardStoredHistory = true;
     history = [];
     persist();
   }
@@ -241,7 +273,12 @@ Singleton {
   Timer {
     id: persistTimer
     interval: 200
-    onTriggered: Bridge.send("history", root.history)
+    onTriggered: {
+      if (!root.historyInitialized || !Bridge.connected || !Bridge.notificationHistoryReady)
+        return;
+      root.historyDirty = false;
+      Bridge.send("history", root.history);
+    }
   }
   Timer {
     id: expiryTimer

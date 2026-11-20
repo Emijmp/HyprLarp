@@ -103,7 +103,7 @@ class BackendSettingsEfficiencyTests(unittest.TestCase):
     self.addCleanup(self.service.executor.shutdown, wait=True)
     self.service.serving = True
     self.service.configuration_focused = True
-    self.service.sync_watchers = Mock()
+    self.service.sync_watchers = Mock(return_value=None)
     self.service.sync_hardware = Mock()
     self.service.queue_refresh = Mock()
     self.service.wakeup.set = Mock()

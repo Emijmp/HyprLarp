@@ -16,16 +16,21 @@ python3 tools/release.py prepare --tag "v$(cat VERSION)" --output .runtime/relea
 python3 tools/release.py verify .runtime/release
 ```
 
-El comando `prepare` reutiliza el archivador del empaquetado para producir las
-fuentes reproducibles, extrae las notas de la versión y genera `SHA256SUMS`.
+El comando `prepare` conserva el archivo fuente que acompaña al `PKGBUILD` del
+empaquetado, comprueba su nombre y SHA-256 y contrasta su contenido con el código
+actual antes de generar las notas y `SHA256SUMS`. Si las fuentes han cambiado,
+exige reconstruir el paquete. Así no recompresa las fuentes con otra versión de
+Python o zlib ni altera la suma de la receta. Cuando no hay una receta preparada,
+utiliza el archivador del empaquetado para producir las fuentes reproducibles.
 La carpeta debe contener exactamente un paquete Arch de la versión actual.
 `--source-only` permite preparar únicamente las fuentes para revisión, en una
 carpeta distinta sin paquetes. Ninguno de estos comandos crea etiquetas, hace push
 ni contacta con GitHub para publicar.
 
-`SOURCE_DATE_EPOCH` fija las fechas del archivo fuente. Si no se proporciona se
-utiliza cero; para reconstruir un artefacto usa el mismo valor registrado en la
-preparación. El workflow utiliza la fecha del commit etiquetado. Los archivos fuente
+`SOURCE_DATE_EPOCH` fija las fechas al crear el archivo fuente. Si no se proporciona
+se utiliza cero; al reutilizar unas fuentes preparadas se conserva su fecha original.
+Para reconstruir un artefacto usa el mismo valor registrado en la preparación.
+El workflow utiliza la fecha del commit etiquetado. Los archivos fuente
 se seleccionan mediante la misma lista permitida que usa `tools/package.py` y no
 incluyen el estado de ejecución, cachés, copias locales ni configuración privada.
 

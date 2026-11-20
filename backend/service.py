@@ -216,7 +216,11 @@ class Service:
     self.snapshot_lock = threading.Lock()
     self.snapshots = {}
     self.watchers: list[subprocess.Popen] = []
-    self.watcher_lock = threading.Lock()
+    self.watcher_lock = threading.RLock()
+    self.watcher_slots = {}
+    self.watcher_started = {}
+    self.watcher_failures = {}
+    self.watcher_retry = {}
     self.output_names = None
     self.active_panel = ""
     self.configuration_focused = False
@@ -375,18 +379,62 @@ class Service:
     except (OSError, ValueError):
       self.emit("history", [])
 
-  def sync_watchers(self) -> None:
+  def stop_watchers(self) -> None:
     with self.watcher_lock:
-      enabled = self.store.settings["clipboardEnabled"] and not self.store.settings["clipboardPaused"] and not self.preview and not self.settings_only
-      if not enabled:
-        for watcher in self.watchers:
+      watchers, self.watchers = self.watchers, []
+      self.watcher_slots.clear()
+      self.watcher_started.clear()
+      self.watcher_failures.clear()
+      self.watcher_retry.clear()
+      for watcher in watchers:
+        try:
           if watcher.poll() is None:
             watcher.terminate()
-        self.watchers.clear()
-      elif not self.watchers and shutil.which("wl-paste") and shutil.which("cliphist"):
-        for mime in ["text", "image"]:
-          self.watchers.append(subprocess.Popen([sys.executable, str(ROOT / "backend/child.py"), str(os.getpid()), "wl-paste", "--type", mime, "--watch", sys.executable, str(ROOT / "backend/clipboard_store.py")],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+          try:
+            watcher.wait(timeout=0.3)
+          except subprocess.TimeoutExpired:
+            watcher.kill()
+            watcher.wait(timeout=1)
+        except (OSError, subprocess.TimeoutExpired):
+          pass
+
+  def sync_watchers(self) -> float | None:
+    with self.watcher_lock:
+      enabled = self.store.settings["clipboardEnabled"] and not self.store.settings["clipboardPaused"] and not self.preview and not self.settings_only and not self.stopping.is_set()
+      if not enabled:
+        self.stop_watchers()
+        return None
+      now = time.monotonic()
+      for mime, watcher in list(self.watcher_slots.items()):
+        if watcher.poll() is None:
+          continue
+        self.watchers.remove(watcher)
+        del self.watcher_slots[mime]
+        if now - self.watcher_started.pop(mime, now) >= 30:
+          self.watcher_failures[mime] = 0
+        self.watcher_failures[mime] = min(6, self.watcher_failures.get(mime, 0) + 1)
+        self.watcher_retry[mime] = now + min(60, 2 ** self.watcher_failures[mime])
+      if len(self.watcher_slots) < 2 and (not shutil.which("wl-paste") or not shutil.which("cliphist")):
+        return 30
+      for mime in ["text", "image"]:
+        if mime in self.watcher_slots or now < self.watcher_retry.get(mime, 0):
+          continue
+        try:
+          watcher = subprocess.Popen([sys.executable, str(ROOT / "backend/child.py"), str(os.getpid()), "wl-paste", "--type", mime, "--watch", sys.executable, str(ROOT / "backend/clipboard_store.py")],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as error:
+          self.watcher_failures[mime] = min(6, self.watcher_failures.get(mime, 0) + 1)
+          self.watcher_retry[mime] = now + min(60, 2 ** self.watcher_failures[mime])
+          self.emit("error", "No se pudo iniciar el portapapeles: " + str(error))
+          continue
+        self.watchers.append(watcher)
+        self.watcher_slots[mime] = watcher
+        self.watcher_started[mime] = now
+        self.watcher_retry.pop(mime, None)
+      # Share existing scheduler wakes for two cheap waitpid probes. Otherwise
+      # check every 30 seconds, or sooner for a retry, without monitor threads.
+      retry = min(self.watcher_retry.values(), default=now + 30)
+      return max(0.05, min(30, retry - now))
 
   def sync_hardware(self):
     if not self.serving:
@@ -419,6 +467,7 @@ class Service:
     due, previous = {}, {}
     while not self.stopping.is_set():
       self.wakeup.clear()
+      watcher_timeout = self.sync_watchers()
       plan = self.polling_plan()
       now = time.monotonic()
       for name in set(due) - set(plan):
@@ -444,6 +493,8 @@ class Service:
           due[name] = now + interval
       previous = plan
       timeout = max(0.05, min(due.values()) - time.monotonic()) if due else None
+      if watcher_timeout is not None:
+        timeout = watcher_timeout if timeout is None else min(timeout, watcher_timeout)
       self.wakeup.wait(timeout)
 
   def safe_refresh(self, function, scope=None) -> None:
@@ -813,10 +864,7 @@ class Service:
       self.bluetooth_manager.close()
       self.backlight.stop()
       self.night.close()
-      with self.watcher_lock:
-        for watcher in self.watchers:
-          if watcher.poll() is None:
-            watcher.terminate()
+      self.stop_watchers()
       self.executor.shutdown(wait=False, cancel_futures=True)
 
 

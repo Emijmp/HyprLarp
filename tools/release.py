@@ -131,7 +131,7 @@ def prepare(output, *, root=ROOT, tag=None, verify_git=False, source_only=False)
     raise ValueError("La carpeta de publicación no puede ser un enlace simbólico")
   directory.mkdir(parents=True, exist_ok=True)
   # Packaging owns the only source-file allowlist and the reproducible archiver.
-  from tools.package import arch_version, source_archive
+  from tools.package import arch_version, source_archive, verify_source_archive
   release = state["release"]
   try:
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
@@ -153,10 +153,24 @@ def prepare(output, *, root=ROOT, tag=None, verify_git=False, source_only=False)
   notes = directory / "RELEASE_NOTES.md"
   if notes.is_symlink():
     raise ValueError("Las notas no pueden ser un enlace simbólico")
-  source_archive(source, root=Path(root), epoch=epoch)
+  recipe = directory / "PKGBUILD"
+  if recipe.exists() or recipe.is_symlink():
+    regular_asset(recipe, directory)
+    regular_asset(source, directory)
+    with recipe.open("rb") as stream:
+      content = stream.read(MANIFEST_LIMIT + 1)
+    if len(content) > MANIFEST_LIMIT:
+      raise ValueError("PKGBUILD supera 64 KiB")
+    text = content.decode("utf-8")
+    names = re.findall(r"^source=\('([^'\r\n]+)'\)$", text, re.MULTILINE)
+    hashes = re.findall(r"^sha256sums=\('([a-f0-9]{64})'\)$", text, re.MULTILINE)
+    if names != [source.name] or hashes != [digest(source)]:
+      raise ValueError("PKGBUILD no coincide con el archivo fuente preparado; reconstruye el paquete")
+    epoch = verify_source_archive(source, root=Path(root))["source_date_epoch"]
+  else:
+    source_archive(source, root=Path(root), epoch=epoch)
   notes.write_text(state["notes"], encoding="utf-8")
   assets.extend([source, notes])
-  recipe = directory / "PKGBUILD"
   if recipe.exists() or recipe.is_symlink():
     assets.append(regular_asset(recipe, directory))
   checksum = write_checksums(directory, assets)

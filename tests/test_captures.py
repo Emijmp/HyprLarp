@@ -33,7 +33,7 @@ class CaptureTests(unittest.TestCase):
     self.monitors = [{"name": "eDP-1", "refreshRate": 60}, {"name": "DP-1", "refreshRate": 144}]
     self.surfaces = {name: {"levels": {"3": [layer()]}} for name in ("eDP-1", "DP-1")}
     self.process = SimpleNamespace(pid=9876, poll=Mock(return_value=None))
-    self.service = SimpleNamespace(store=SimpleNamespace(directory=self.folder), emit=Mock())
+    self.service = SimpleNamespace(store=SimpleNamespace(directory=self.folder), emit=Mock(), preview=False)
     self.api = SimpleNamespace(command=Mock(side_effect=self.command),
       optional=lambda argv, fallback: str(self.folder / "Pictures"), private_directory=safety.private_directory)
     self.capture = captures.Captures(self.service, self.api)
@@ -131,12 +131,69 @@ class CaptureTests(unittest.TestCase):
 
   def test_clipboard_failure_preserves_the_successfully_saved_capture(self):
     self.capture.copy.side_effect = RuntimeError("clipboard unavailable")
-    with self.assertRaisesRegex(RuntimeError, "clipboard unavailable"):
-      self.capture.capture({"mode": "region"})
+    self.capture.capture({"mode": "region"})
     images = list((self.folder / "Pictures/Screenshots").glob("*.png"))
     self.assertEqual(len(images), 1)
     self.assertEqual(images[0].read_bytes(), b"captured frame")
     self.assertFalse(self.capture.capture_lock.locked())
+    self.assertIn("no se pudo copiar", self.service.emit.call_args.args[1])
+
+  def editor_draft(self):
+    self.capture.directory.mkdir()
+    source = self.capture.directory / "draft.png"
+    source.write_bytes(b"original draft")
+    self.capture.drafts["test"] = {"path": source, "width": 400, "height": 300}
+    return source
+
+  def test_failed_editor_conversion_removes_partial_output_and_allows_retry(self):
+    source = self.editor_draft()
+    def convert(argv, **options):
+      Path(argv[-1]).write_bytes(b"partial PNG")
+      raise RuntimeError("conversion failed")
+    self.api.command.side_effect = convert
+    with self.assertRaisesRegex(RuntimeError, "conversion failed"):
+      self.capture.handle("capture-save", {"token": "test"})
+    self.assertEqual(list((self.folder / "Pictures/Screenshots").glob("*.png")), [])
+    self.assertEqual(source.read_bytes(), b"original draft")
+    self.assertIn("test", self.capture.drafts)
+    self.capture.copy.assert_not_called()
+    self.api.command.side_effect = lambda argv, **options: Path(argv[-1]).write_bytes(b"finished PNG")
+    self.assertTrue(self.capture.handle("capture-save", {"token": "test"}))
+    images = list((self.folder / "Pictures/Screenshots").glob("*.png"))
+    self.assertEqual([image.read_bytes() for image in images], [b"finished PNG"])
+    self.assertFalse(source.exists())
+    self.assertEqual(self.capture.drafts, {})
+
+  def test_editor_clipboard_failure_completes_save_and_cleans_draft(self):
+    source = self.editor_draft()
+    self.api.command.side_effect = lambda argv, **options: Path(argv[-1]).write_bytes(b"finished PNG")
+    self.capture.copy.side_effect = subprocess.CalledProcessError(1, ["wl-copy"])
+    self.assertTrue(self.capture.handle("capture-save", {"token": "test"}))
+    images = list((self.folder / "Pictures/Screenshots").glob("*.png"))
+    self.assertEqual([image.read_bytes() for image in images], [b"finished PNG"])
+    self.assertEqual(self.capture.drafts, {})
+    self.assertFalse(source.exists())
+    self.assertEqual(list(self.capture.directory.iterdir()), [])
+    self.assertIn("no se pudo copiar", self.service.emit.call_args.args[1])
+
+  def test_open_editor_keeps_its_draft_until_finished_without_blocking_plain_captures(self):
+    with patch.object(captures.shutil, "which", return_value="/usr/bin/magick"):
+      self.capture.capture({"mode": "region", "annotate": True})
+      token = next(iter(self.capture.drafts))
+      path = self.capture.drafts[token]["path"]
+      self.api.command.reset_mock()
+      with patch.object(captures, "freeze_outputs", side_effect=AssertionError("An open editor must not start another selector")), \
+          self.assertRaisesRegex(RuntimeError, "editor"):
+        self.capture.capture({"mode": "region", "annotate": True, "freeze": True})
+      self.api.command.assert_not_called()
+      self.assertEqual(list(self.capture.drafts), [token])
+      self.assertEqual(path.read_bytes(), b"captured frame")
+      self.capture.capture({"mode": "region"})
+      self.assertEqual(list(self.capture.drafts), [token])
+      self.assertTrue(self.capture.handle("capture-discard", {"token": token}))
+      self.capture.capture({"mode": "region", "annotate": True})
+      self.assertEqual(len(self.capture.drafts), 1)
+      self.assertNotIn(token, self.capture.drafts)
 
   def test_freeze_failure_during_selection_cannot_save_a_live_frame(self):
     self.process.poll.side_effect = [None, 1]

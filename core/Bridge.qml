@@ -148,6 +148,7 @@ Singleton {
     })
   property var bluetoothPrompt: null
   property var history: []
+  property bool notificationHistoryReady: false
   property var batteryAlerts: []
   property var faults: []
   property var pending: ({})
@@ -506,6 +507,7 @@ Singleton {
         break;
       case "history":
         history = event.data;
+        notificationHistoryReady = true;
         historyLoaded(event.data);
         break;
       case "battery-alert":
@@ -573,6 +575,7 @@ Singleton {
     onStarted: {
       root.connected = true;
       root.awaitingInitial = true;
+      root.notificationHistoryReady = false;
     }
     onExited: (code, status) => {
       root.connected = false;

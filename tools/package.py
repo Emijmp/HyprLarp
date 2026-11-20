@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
@@ -128,6 +129,61 @@ def source_archive(destination, *, root=ROOT, epoch=0):
   return destination
 
 
+def verify_source_archive(source, *, root=ROOT):
+  """Check a prepared source without changing its gzip stream or timestamps."""
+  root = Path(root).resolve()
+  release = read_version(root)
+  selected = files(root)
+  prefix = 'hyprlarp-' + release + '/'
+  seen, timestamp = set(), None
+  # Leave room for PAX headers, block padding and the final tar records, while
+  # bounding any additional gzip members hidden after the end of the tar.
+  budget = sum(path.stat().st_size for path in selected.values()) + len(selected) * 8192 + 2 * tarfile.RECORDSIZE
+  try:
+    with gzip.open(source, 'rb') as compressed:
+      with tarfile.open(fileobj=compressed, mode='r|') as archive:
+        for entry in archive:
+          name = entry.name.removeprefix(prefix)
+          if (not entry.name.startswith(prefix) or name not in selected or name in seen
+              or not entry.isfile() or entry.mode != (0o755 if name in EXECUTABLES else 0o644)):
+            raise ValueError('El archivo fuente contiene entradas ajenas o no válidas')
+          expected = selected[name]
+          if entry.size != expected.stat().st_size:
+            raise ValueError('Las fuentes preparadas no coinciden con el árbol actual; reconstruye el paquete')
+          with archive.extractfile(entry) as content, expected.open('rb') as current:
+            if hashlib.file_digest(content, 'sha256').digest() != hashlib.file_digest(current, 'sha256').digest():
+              raise ValueError('Las fuentes preparadas no coinciden con el árbol actual; reconstruye el paquete')
+          epoch = epoch_value(entry.mtime)
+          if timestamp is not None and timestamp != epoch:
+            raise ValueError('Las fuentes preparadas contienen fechas inconsistentes')
+          timestamp = epoch
+          seen.add(name)
+      remaining = budget - compressed.tell()
+      while remaining >= 0:
+        extra = compressed.read(min(64 * 1024, remaining + 1))
+        if not extra:
+          break
+        remaining -= len(extra)
+      if remaining < 0:
+        raise ValueError('El archivo fuente contiene demasiados datos adicionales')
+  except (tarfile.TarError, EOFError, gzip.BadGzipFile, zlib.error) as error:
+    raise ValueError('El archivo fuente preparado no es un tar.gz válido') from error
+  if seen != selected.keys():
+    raise ValueError('Faltan archivos en las fuentes preparadas; reconstruye el paquete')
+  return {'release': release, 'files': len(seen), 'source_date_epoch': timestamp}
+
+
+def atomic_text(destination, content):
+  descriptor, temporary = tempfile.mkstemp(prefix='.hyprlarp-artifact-', dir=destination.parent)
+  try:
+    with os.fdopen(descriptor, 'w', encoding='utf-8') as target:
+      target.write(content)
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, destination)
+  finally:
+    Path(temporary).unlink(missing_ok=True)
+
+
 def write(destination, content, mode=0o644):
   destination.parent.mkdir(parents=True, exist_ok=True)
   destination.write_bytes(content)
@@ -175,8 +231,16 @@ def stage(destdir, *, root=ROOT):
 def prepare(output, *, root=ROOT, epoch=None, pkgrel=1):
   root, output = Path(root).resolve(), Path(output).absolute()
   pkgrel = package_release(pkgrel)
-  output.mkdir(parents=True, exist_ok=True)
   version = read_version(root)
+  for path in [output, *output.parents, output / 'PKGBUILD', output / 'build-info.json',
+      output / ('hyprlarp-' + version + '.tar.gz')]:
+    if path.is_symlink():
+      raise ValueError('La preparación no escribe a través de enlaces simbólicos: ' + str(path))
+  for name in ['PKGBUILD', 'build-info.json']:
+    path = output / name
+    if path.exists() and not path.is_file():
+      raise ValueError('El artefacto debe ser un archivo regular: ' + str(path))
+  output.mkdir(parents=True, exist_ok=True)
   archive = source_archive(output / ('hyprlarp-' + version + '.tar.gz'), root=root, epoch=epoch_value(epoch))
   checksum = digest(archive.read_bytes())
   recipe = (root / 'packaging/arch/PKGBUILD.in').read_text()
@@ -186,10 +250,10 @@ def prepare(output, *, root=ROOT, epoch=None, pkgrel=1):
     recipe = recipe.replace(token, value)
   if re.search(r'@[A-Z]+@', recipe):
     raise ValueError('La plantilla PKGBUILD contiene variables desconocidas')
-  (output / 'PKGBUILD').write_text(recipe)
+  atomic_text(output / 'PKGBUILD', recipe)
   metadata = {'release': version, 'pkgver': arch_version(version), 'pkgrel': pkgrel,
     'source': archive.name, 'sha256': checksum}
-  (output / 'build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
+  atomic_text(output / 'build-info.json', json.dumps(metadata, indent=2) + '\n')
   return metadata
 
 

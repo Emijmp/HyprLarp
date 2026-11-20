@@ -1,5 +1,21 @@
 # Cambios de HyprLarp
 
+## [Sin publicar]
+
+- El historial de notificaciones espera su carga inicial antes de guardar cambios,
+  conserva los avisos recibidos durante el arranque y respeta las eliminaciones al
+  recuperar el backend.
+- El portapapeles recupera sus procesos de texto e imagen por separado, con espera
+  progresiva ante fallos, y recoge los procesos al pausarse o cerrar el shell.
+- Las capturas eliminan archivos incompletos si falla la conversión; un fallo al
+  copiar avisa sin perder la imagen guardada ni dejar el editor pendiente. El editor
+  conserva su borrador hasta guardarlo o descartarlo antes de aceptar otro.
+- Las solicitudes de iconos sin respuesta se reintentan al recuperar el backend,
+  conservando los resultados ya disponibles en caché.
+- La preparación de publicaciones conserva las fuentes usadas para construir el
+  paquete y verifica su correspondencia con la receta y el código actual. Las
+  recetas y los metadatos se reemplazan de forma atómica, sin seguir enlaces.
+
 ## [0.1.1] - 2026-11-19
 
 - Las pruebas del panel de rendimiento esperan la confirmación de arranque del
