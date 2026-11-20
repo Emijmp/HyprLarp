@@ -3,6 +3,7 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -132,7 +133,8 @@ class NativeShortcutTests(unittest.TestCase):
       source = 'local manager=dofile(' + lua_value(str(ROOT / "config/bindings-runtime.lua")) + ')\nmanager.begin()\n'
       source += body.replace("APPLY()", "dofile(" + lua_value(str(compiled)) + ")")
       script.write_text(source)
-      result = subprocess.run(["Hyprland", "--verify-config", "--config", str(script)], capture_output=True, text=True, timeout=10)
+      result = subprocess.run(["Hyprland", "--verify-config", "--config", str(script)],
+        env={**os.environ, "XDG_RUNTIME_DIR": temporary}, capture_output=True, text=True, timeout=10)
       self.assertEqual(result.returncode, 0, result.stdout[-1500:] + result.stderr[-2500:])
       self.assertIn("config ok", result.stdout)
       return result.stdout

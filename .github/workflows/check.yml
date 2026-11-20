@@ -52,6 +52,9 @@ jobs:
           useradd --create-home --user-group hyprlarp-ci
           mkdir -p .runtime/ci
           chown -R hyprlarp-ci:hyprlarp-ci "$GITHUB_WORKSPACE"
+          runtime="$RUNNER_TEMP/hyprlarp-runtime"
+          install -d -m 700 -o hyprlarp-ci -g hyprlarp-ci "$runtime"
+          printf 'XDG_RUNTIME_DIR=%s\n' "$runtime" >> "$GITHUB_ENV"
       - name: Registrar versiones
         run: |
           mkdir -p .runtime/ci
@@ -89,6 +92,9 @@ jobs:
           useradd --create-home --user-group hyprlarp-builder
           mkdir -p .runtime/distribution/base .runtime/distribution/upgrade
           chown -R hyprlarp-builder:hyprlarp-builder "$GITHUB_WORKSPACE"
+          runtime="$RUNNER_TEMP/hyprlarp-runtime"
+          install -d -m 700 -o hyprlarp-builder -g hyprlarp-builder "$runtime"
+          printf 'XDG_RUNTIME_DIR=%s\n' "$runtime" >> "$GITHUB_ENV"
       - name: Construir dos revisiones para probar una actualización real
         run: |
           runuser -u hyprlarp-builder -- python3 tools/package.py build --output .runtime/distribution/base

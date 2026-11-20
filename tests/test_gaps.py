@@ -1,4 +1,5 @@
 import copy
+import os
 from pathlib import Path
 import shutil
 import stat
@@ -126,7 +127,8 @@ class NativeWindowGapTests(unittest.TestCase):
         + 'dofile(' + lua_string(str(prefix / 'share/hyprlarp/config/hyprland-look.lua')) + ')\n'
         + 'local out=hl.get_config("general.gaps_out")\nassert(out.top==10 and out.right==20 and out.bottom==30 and out.left==40)\n'
         + 'assert(hl.get_config("general.gaps_in").top==6)\n')
-      result = subprocess.run(['Hyprland', '--verify-config', '--config', str(script)], capture_output=True, text=True, timeout=10)
+      result = subprocess.run(['Hyprland', '--verify-config', '--config', str(script)],
+        env={**os.environ, 'XDG_RUNTIME_DIR': temporary}, capture_output=True, text=True, timeout=10)
       self.assertEqual(result.returncode, 0, result.stdout[-1800:] + result.stderr[-1500:])
 
   def verify(self, content, assertions):
@@ -137,7 +139,8 @@ class NativeWindowGapTests(unittest.TestCase):
       lua = root / 'verify.lua'
       lua.write_text('local loader=dofile(' + lua_string(str(ROOT / 'config/window-gaps-loader.lua')) + ')\n'
         + 'hl.config({general={gaps_in=2,gaps_out=3}})\nlocal valid=loader(' + lua_string(str(data)) + ')\n' + assertions)
-      result = subprocess.run(['Hyprland', '--verify-config', '--config', str(lua)], capture_output=True, text=True, timeout=10)
+      result = subprocess.run(['Hyprland', '--verify-config', '--config', str(lua)],
+        env={**os.environ, 'XDG_RUNTIME_DIR': temporary}, capture_output=True, text=True, timeout=10)
       self.assertEqual(result.returncode, 0, result.stdout[-1600:] + result.stderr[-1500:])
       self.assertIn('config ok', result.stdout)
 

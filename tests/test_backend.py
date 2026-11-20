@@ -1,6 +1,7 @@
 import copy
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import subprocess
@@ -334,7 +335,9 @@ class InstallerTests(unittest.TestCase):
                + "dofile(" + lua_string(str(prefix / "config/hyprlarp/hyprlarp.lua")) + ")\n"
                + "dofile(" + lua_string(str(ROOT / "config/hyprland-look.lua")) + ")\n")
       result = subprocess.run(["Hyprland", "--verify-config", "--config", str(config)],
+                  env={**os.environ, "XDG_RUNTIME_DIR": directory},
                   capture_output=True, text=True, timeout=15)
+      self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
       self.assertIn("config ok", result.stdout, result.stdout + result.stderr)
 
 

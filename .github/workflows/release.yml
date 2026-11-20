@@ -41,6 +41,9 @@ jobs:
           useradd --create-home --user-group hyprlarp-release
           mkdir -p .runtime/release
           chown -R hyprlarp-release:hyprlarp-release "$GITHUB_WORKSPACE"
+          runtime="$RUNNER_TEMP/hyprlarp-runtime"
+          install -d -m 700 -o hyprlarp-release -g hyprlarp-release "$runtime"
+          printf 'XDG_RUNTIME_DIR=%s\n' "$runtime" >> "$GITHUB_ENV"
       - name: Validar versión, etiqueta y cambios
         run: |
           runuser -u hyprlarp-release -- python3 tools/release.py check --tag "$RELEASE_TAG" --verify-git

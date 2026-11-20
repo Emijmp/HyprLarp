@@ -64,6 +64,14 @@ no crea una etiqueta remota automáticamente: el mantenedor decide qué commit
 etiquetar y enviar. La ejecución de un workflow en GitHub requiere que estos archivos
 ya estén en el repositorio remoto.
 
+Si una etiqueta existente falló por la preparación del entorno de CI, publica la
+corrección del workflow en `main` y ejecuta **Actions → Preparar publicación → Run
+workflow**, seleccionando la rama `main` e indicando esa etiqueta, por ejemplo
+`v0.1.0`. El workflow actualizado prepara un runtime privado y descarga las fuentes
+de la etiqueta original. Así puede reconstruirse esa publicación sin mover la
+etiqueta ni cambiar sus fuentes. Reejecutar el run anterior utiliza el workflow
+anterior; no incorpora la corrección de `main`.
+
 SHA-256 permite comprobar que una descarga conserva los bytes preparados. No es
 una firma del paquete ni acredita por sí sola su autoría; esta primera preparación
 no incorpora claves privadas ni firma con credenciales locales.
@@ -71,3 +79,5 @@ no incorpora claves privadas ni firma con credenciales locales.
 Referencias: [crear publicaciones en borrador con GitHub CLI](https://cli.github.com/manual/gh_release_create),
 [subir artefactos a una publicación](https://cli.github.com/manual/gh_release_upload) y
 [permisos mínimos de GITHUB_TOKEN](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token).
+Para volver a construir, consulta [ejecución manual](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+y [comportamiento de las reejecuciones](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).

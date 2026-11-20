@@ -19,6 +19,12 @@ Las acciones se fijan por SHA y el checkout no conserva credenciales. El workflo
 el de [publicación](releasing.md) prepara artefactos y un borrador revisable al recibir
 una etiqueta que coincida con `VERSION` y `CHANGELOG.md`.
 
+Los jobs Arch preparan un `XDG_RUNTIME_DIR` privado, de modo 0700 y propiedad del
+usuario de pruebas. Hyprland lo requiere incluso con `--verify-config`, aunque no
+se inicie una sesión gráfica. Las pruebas nativas de Lua, espacios y atajos usan
+además su propio directorio temporal, por lo que también funcionan al ejecutar
+unittest directamente sin heredar el runtime del escritorio.
+
 ## Organización del backend
 
 | Módulo | Responsabilidad |
